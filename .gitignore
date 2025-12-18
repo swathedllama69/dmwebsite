@@ -35,6 +35,8 @@ build/
 out/
 .vercel
 .netlify
+.bak
+
 
 # --- Environment & Sensitive Data ---
 .env

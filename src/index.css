@@ -2,18 +2,68 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom fonts or overrides */
+/* 1. THEME VARIABLE DEFINITIONS 
+  These are the "slots" that will be filled by the database values in Step 4.
+  Defaults are set to the "Devolt Punk" theme.
+*/
+:root {
+  /* Colors */
+  --accent-color: #CCFF00;
+  /* Replaces the hardcoded Lime */
+  --bg-color: #000000;
+  /* Main page background */
+  --card-bg: #111111;
+  /* Product/Admin card background */
+  --text-color: #FFFFFF;
+  /* Primary text color */
+
+  /* Header Specifics */
+  --header-bg: #000000;
+  /* Nav background */
+  --header-text: #FFFFFF;
+  /* Nav text & "DEVOLT" logo color */
+
+  /* Fonts - Options A, B, and C will be injected here via JS */
+  --font-heading: 'Space Grotesk', sans-serif;
+  --font-body: 'JetBrains Mono', monospace;
+}
+
+/* 2. GLOBAL STYLES */
 body {
-  /* REMOVE @apply bg-slate-950 */
   background-color: var(--bg-color);
   color: var(--text-color);
-  font-family: var(--font-main);
+  font-family: var(--font-body);
+  /* Standard body text */
   transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s ease;
   margin: 0;
   min-height: 100vh;
 }
 
-/* --- Global Logo Animations --- */
+/* Force headings to use the heading font variable */
+h1,
+h2,
+h3,
+h4,
+.font-display {
+  font-family: var(--font-heading);
+}
+
+/* 3. DYNAMIC UTILITIES */
+.animated-cyber-grid {
+  /* Updated to use the variable accent color instead of hardcoded #CCFF00 */
+  background-image: radial-gradient(circle, var(--accent-color) 1px, transparent 1px);
+  background-size: 50px 50px;
+  background-repeat: repeat;
+  animation: pulse-grid 8s infinite ease-in-out;
+}
+
+/* Logo and Header text color logic */
+.nav-text-dynamic {
+  color: var(--header-text);
+  transition: color 0.3s ease;
+}
+
+/* --- Keep your existing animations below --- */
 @keyframes spin-slow {
   from {
     transform: rotate(0deg);
@@ -38,17 +88,6 @@ body {
   }
 }
 
-/* Class applied to logo when scrolling */
-.logo-scrolling-animate {
-  animation: spin-slow 8s linear infinite;
-}
-
-/* Class applied to logo during initial loading */
-.logo-loading-pulse {
-  animation: pulse-logo 1.5s ease-in-out infinite;
-}
-
-/* --- Add this to your main CSS file (e.g., index.css) --- */
 @keyframes pulse-grid {
   0% {
     transform: scale(1);
@@ -66,12 +105,10 @@ body {
   }
 }
 
-.animated-cyber-grid {
-  /* Base Grid */
-  background-image: radial-gradient(circle, #CCFF00 1px, transparent 1px);
-  background-size: 50px 50px;
-  background-repeat: repeat;
+.logo-scrolling-animate {
+  animation: spin-slow 8s linear infinite;
+}
 
-  /* Animation */
-  animation: pulse-grid 8s infinite ease-in-out;
+.logo-loading-pulse {
+  animation: pulse-logo 1.5s ease-in-out infinite;
 }
