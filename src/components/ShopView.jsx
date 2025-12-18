@@ -1,0 +1,486 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { Loader2, ArrowRight, Package, ArrowLeft, RefreshCw, Star } from 'lucide-react';
+import { formatCurrency, getPrimaryImage } from '../utils/config.js';
+import { useNavigate } from 'react-router-dom';
+
+// --- Image Slideshow Component ---
+const ImageSlideshow = ({ images, interval = 7000 }) => {
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const totalImages = images.length;
+    const slidesPerView = 2;
+    const maxIndex = totalImages > slidesPerView ? totalImages - slidesPerView + 1 : 1;
+    const carouselItems = totalImages >= slidesPerView ? [...images, images[0]] : images;
+    const isNavigationVisible = totalImages > slidesPerView;
+    const isSlideshowRunning = totalImages > slidesPerView;
+    const containerWidth = carouselItems.length * 50;
+    const transformValue = `translateX(-${currentIndex * (100 / carouselItems.length)}%)`;
+
+    useEffect(() => {
+        if (!isSlideshowRunning) return;
+        const timer = setInterval(() => {
+            setCurrentIndex((prevIndex) => {
+                const nextIndex = (prevIndex + 1);
+                if (nextIndex >= maxIndex) {
+                    setTimeout(() => setCurrentIndex(0), 1000);
+                    return maxIndex;
+                }
+                return nextIndex;
+            });
+        }, interval);
+        return () => clearInterval(timer);
+    }, [isSlideshowRunning, maxIndex, interval, totalImages]);
+
+    const goToPrev = () => {
+        if (!isNavigationVisible) return;
+        setCurrentIndex((prevIndex) => (prevIndex - 1 + maxIndex) % maxIndex);
+    };
+
+    const goToNext = () => {
+        if (!isNavigationVisible) return;
+        setCurrentIndex((prevIndex) => (prevIndex + 1) % maxIndex);
+    };
+
+    if (!images || totalImages < 2) return null;
+
+    return (
+        <div className="relative w-full overflow-hidden bg-[#0a0a0a] border-y border-white/10 h-[400px] group">
+            <div className="aspect-[4/1] w-full h-full">
+                <div
+                    className={`flex h-full`}
+                    style={{
+                        width: `${containerWidth}%`,
+                        transform: transformValue,
+                        transition: currentIndex === 0 && transformValue !== `translateX(0%)` && !isSlideshowRunning
+                            ? 'none'
+                            : 'transform 1000ms cubic-bezier(0.25, 1, 0.5, 1)'
+                    }}
+                >
+                    {carouselItems.map((image, index) => (
+                        <div key={index} className="h-full flex-shrink-0 relative border-r border-white/5" style={{ width: `${100 / carouselItems.length}%` }}>
+                            <img
+                                src={image || null}
+                                alt={`Process ${index + 1}`}
+                                className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 opacity-60 group-hover:opacity-100"
+                                loading="lazy"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {isNavigationVisible && (
+                <>
+                    <button onClick={goToPrev} className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 backdrop-blur-md text-white hover:bg-[#CCFF00] hover:text-black transition-all rounded-full z-20 border border-white/10">
+                        <ArrowLeft size={20} />
+                    </button>
+                    <button onClick={goToNext} className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 backdrop-blur-md text-white hover:bg-[#CCFF00] hover:text-black transition-all rounded-full z-20 border border-white/10">
+                        <ArrowRight size={20} />
+                    </button>
+                </>
+            )}
+        </div>
+    );
+};
+
+// --- Helper: Calculate Discount ---
+const getDiscountPercentage = (price, salePrice) => {
+    if (!price || !salePrice || price <= salePrice) return null;
+    return Math.round(((price - salePrice) / price) * 100);
+};
+
+// --- Vertical ProductCard ---
+export const ProductCard = ({ product, currentCurrency, addToCart, setProductId, setNotification }) => {
+    const primaryImage = getPrimaryImage(product.images);
+    const discount = getDiscountPercentage(product.price, product.sale_price);
+
+    // NEW: Directly use pre-calculated prices from the API
+    const displayPrice = product.pricing?.[currentCurrency] || 0;
+    const displaySalePrice = product.sale_pricing?.[currentCurrency] || 0;
+
+    const handleAddToCart = (e) => {
+        e.stopPropagation();
+        addToCart(product, 1);
+        setNotification({ message: `${product.name.toUpperCase()} BAGGED`, type: 'success' });
+    };
+
+    return (
+        <div
+            onClick={() => setProductId(product.id)}
+            className="group block bg-[#111] border border-white/5 rounded-xl overflow-hidden shadow-lg hover:shadow-[#CCFF00]/10 transition-all duration-500 hover:-translate-y-2 cursor-pointer relative"
+        >
+            {product.on_sale && product.sale_price > 0 && (
+                <div className="absolute top-3 right-3 z-10 flex flex-col items-end gap-1">
+                    <span className="bg-red-600 text-white text-[10px] font-bold px-3 py-1 uppercase tracking-widest rounded-sm shadow-md">
+                        SALE
+                    </span>
+                    {discount && (
+                        <span className="bg-white text-black text-[9px] font-bold px-2 py-0.5 rounded-sm">
+                            -{discount}%
+                        </span>
+                    )}
+                </div>
+            )}
+
+            <div className="aspect-[4/5] w-full bg-[#050505] overflow-hidden relative">
+                {primaryImage ? (
+                    <img
+                        src={primaryImage}
+                        alt={product.name}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100"
+                        loading="lazy"
+                    />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[#333]"><Package size={48} /></div>
+                )}
+                <div className="absolute inset-x-0 bottom-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300 bg-gradient-to-t from-black via-black/80 to-transparent">
+                    <button
+                        onClick={handleAddToCart}
+                        className="w-full bg-[#CCFF00] text-black font-bold uppercase text-xs py-3 rounded-lg hover:bg-white transition-colors flex items-center justify-center gap-2"
+                    >
+                        <Package size={14} /> Bag It
+                    </button>
+                </div>
+            </div>
+
+            <div className="p-5">
+                <h3 className="text-white font-bold text-lg uppercase tracking-wide truncate group-hover:text-[#CCFF00] transition-colors">{product.name}</h3>
+                <div className="flex justify-between items-center mt-3 border-t border-white/5 pt-3">
+                    <div className="flex flex-col">
+                        <span className="text-[10px] text-gray-500 uppercase tracking-wider">Price</span>
+                        <div className="font-mono text-sm">
+                            {product.on_sale && product.sale_price > 0 ? (
+                                <>
+                                    <span className="text-red-500 font-bold mr-2">{formatCurrency(displaySalePrice, currentCurrency)}</span>
+                                    <span className="text-gray-600 line-through text-xs">{formatCurrency(displayPrice, currentCurrency)}</span>
+                                </>
+                            ) : (
+                                <span className="text-white font-bold">{formatCurrency(displayPrice, currentCurrency)}</span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Horizontal Product Card ---
+const HorizontalProductCard = ({ product, currentCurrency, addToCart, setProductId, setNotification }) => {
+    const primaryImage = getPrimaryImage(product.images);
+    const discount = getDiscountPercentage(product.price, product.sale_price);
+
+    // NEW: Directly use pre-calculated prices from the API
+    const displayPrice = product.pricing?.[currentCurrency] || 0;
+    const displaySalePrice = product.sale_pricing?.[currentCurrency] || 0;
+
+    const handleAddToCart = (e) => {
+        e.stopPropagation();
+        addToCart(product, 1);
+        setNotification({ message: `${product.name.toUpperCase()} BAGGED`, type: 'success' });
+    };
+
+    return (
+        <div
+            onClick={() => setProductId(product.id)}
+            className="flex-shrink-0 w-[280px] md:w-[320px] bg-[#111] border border-white/5 rounded-xl overflow-hidden hover:border-[#CCFF00]/30 transition-all cursor-pointer group"
+        >
+            <div className="relative aspect-video overflow-hidden bg-black">
+                <img src={primaryImage} alt={product.name} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-500" />
+                {product.on_sale && (
+                    <span className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-sm uppercase shadow-sm">
+                        Sale {discount ? `-${discount}%` : ''}
+                    </span>
+                )}
+            </div>
+            <div className="p-4 flex justify-between items-center">
+                <div className="overflow-hidden mr-2">
+                    <h3 className="text-sm font-bold text-white uppercase truncate">{product.name}</h3>
+                    <p className="text-xs text-gray-500 font-mono mt-0.5">
+                        {formatCurrency(product.on_sale ? displaySalePrice : displayPrice, currentCurrency)}
+                    </p>
+                </div>
+                <button onClick={handleAddToCart} className="bg-[#CCFF00] text-black p-2 rounded-full hover:bg-white transition-colors">
+                    <Package size={16} />
+                </button>
+            </div>
+        </div>
+    );
+};
+
+// --- Hero Section ---
+const HeroSection = ({ settings }) => {
+    const opacityVal = settings.heroOverlayOpacity ? parseInt(settings.heroOverlayOpacity) / 100 : 0.5;
+
+    return (
+        <div className="relative h-screen w-full flex items-center justify-center text-center overflow-hidden pt-[100px] md:pt-[120px]">
+            {settings.heroVideoUrl && (
+                <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover" src={settings.heroVideoUrl} />
+            )}
+            <div className="absolute inset-0 z-10 transition-colors duration-700" style={{ backgroundColor: `rgba(0, 0, 0, ${opacityVal})` }} />
+            <div className="relative z-20 p-4 max-w-5xl animate-fade-in-up">
+                <div className="inline-flex items-center gap-2 border border-[#CCFF00]/30 rounded-full px-4 py-1.5 bg-black/40 backdrop-blur-md mb-6">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#CCFF00] animate-pulse" />
+                    <span className="text-[#CCFF00] text-[10px] font-bold uppercase tracking-[0.25em]">Devolt Moulding</span>
+                </div>
+                <h1 className="font-display text-5xl md:text-8xl lg:text-9xl font-bold text-white uppercase tracking-tighter leading-[0.9] drop-shadow-2xl">
+                    {settings.heroSlogan || "Moulding the New Standard"}
+                </h1>
+                <p className="mt-8 text-lg md:text-xl text-gray-300 font-light max-w-2xl mx-auto tracking-wide leading-relaxed">
+                    {settings.heroSubHeadline || "A fusion of high technology and durable design for the modern frontier."}
+                </p>
+                <button
+                    onClick={() => {
+                        const shop = document.getElementById('featured-grid');
+                        if (shop) shop.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="mt-12 group relative bg-[#CCFF00] text-black px-10 py-4 rounded-full font-bold uppercase tracking-widest overflow-hidden hover:scale-105 transition-all shadow-[0_0_40px_-10px_rgba(204,255,0,0.5)]"
+                >
+                    <span className="relative z-10 flex items-center gap-3">
+                        Shop Collection <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                    </span>
+                    <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 mix-blend-overlay" />
+                </button>
+            </div>
+        </div>
+    );
+};
+
+// --- ScrollingBanner ---
+const ScrollingBanner = ({ settings }) => {
+    if (!settings.scrollingText) return null;
+    return (
+        <div className="bg-[#CCFF00] overflow-hidden py-4 whitespace-nowrap border-y border-black">
+            <style jsx="true">{`
+                @keyframes marquee {
+                    0% { transform: translate3d(0, 0, 0); }
+                    100% { transform: translate3d(-50%, 0, 0); }
+                }
+                .animate-marquee {
+                    animation: marquee 20s linear infinite;
+                }
+            `}</style>
+            <div className="animate-marquee inline-block">
+                {[...Array(6)].map((_, i) => (
+                    <span key={i} className="text-black font-display text-xl font-bold uppercase tracking-widest px-12 italic">
+                        {settings.scrollingText}
+                    </span>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+// --- Image Gallery (With Links) ---
+const ImageGallery = ({ settings }) => {
+    if (settings.showImageGallery !== '1') return null;
+
+    const navigate = useNavigate();
+    const imagesString = settings.galleryImages;
+    const linksString = settings.galleryLinks;
+    const galleryTitle = settings.gallerySectionTitle || "Innovation Gallery";
+
+    const images = (imagesString || '').split(',').map(url => url.trim()).filter(url => url.length > 5);
+    const links = (linksString || '').split(',').map(url => url.trim());
+
+    if (images.length === 0) return null;
+
+    return (
+        <section id="image-gallery" className="my-24 px-4 md:px-8 max-w-[1600px] mx-auto">
+            <div className="flex flex-col items-center mb-16">
+                <Star className="text-[#CCFF00] mb-4" size={24} />
+                <h2 className="font-display text-4xl md:text-5xl uppercase text-white text-center tracking-tight">
+                    {galleryTitle}
+                </h2>
+                <div className="w-24 h-1 bg-[#CCFF00] mt-6 rounded-full opacity-50" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {images.map((url, index) => {
+                    const link = links[index];
+                    const isExternal = link && link.startsWith('http');
+
+                    const Content = (
+                        <>
+                            <img
+                                src={url}
+                                alt={`Gallery ${index + 1}`}
+                                className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700"
+                                loading="lazy"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                                {link && (
+                                    <div className="absolute bottom-6 left-6 text-[#CCFF00] flex items-center gap-2 uppercase font-bold text-sm tracking-widest">
+                                        View Page <ArrowRight size={16} />
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    );
+
+                    const containerClass = `relative rounded-2xl overflow-hidden border border-white/5 shadow-2xl group ${index === 0 ? 'md:col-span-2 md:row-span-2 aspect-square md:aspect-auto' : 'aspect-square'}`;
+
+                    if (link) {
+                        return isExternal ? (
+                            <a key={index} href={link} target="_blank" rel="noopener noreferrer" className={`${containerClass} cursor-pointer`}>
+                                {Content}
+                            </a>
+                        ) : (
+                            <div key={index} onClick={() => navigate(link)} className={`${containerClass} cursor-pointer`}>
+                                {Content}
+                            </div>
+                        );
+                    }
+                    return <div key={index} className={containerClass}>{Content}</div>;
+                })}
+            </div>
+        </section>
+    );
+};
+
+// --- Main ShopView Component ---
+export const ShopView = ({
+    products,
+    loading,
+    error,
+    currentCurrency, // 'USD', 'GBP', or 'NGN'
+    addToCart,
+    setNotification,
+    setProductId,
+    settings = {}
+}) => {
+    const navigate = useNavigate();
+
+    const memoizedProducts = useMemo(() => {
+        return {
+            featuredItems: products.filter(p => p.is_featured).slice(0, 4),
+            newArrivalItems: products.slice(0, 5),
+            saleItems: products.filter(p => p.on_sale && p.sale_price > 0).slice(0, 4),
+        };
+    }, [products]);
+
+    const { featuredItems, newArrivalItems, saleItems } = memoizedProducts;
+
+    const bottomBannerImages = settings.bottomBannerImages
+        ? settings.bottomBannerImages.split(',').map(s => s.trim()).filter(Boolean)
+        : [];
+
+    const isNewArrivalsVisible = settings.showNewArrivals === '1';
+    const isSaleItemsVisible = settings.showSaleItems === '1';
+    const themeClass = settings.themeMode === 'light' ? 'theme-light bg-white text-black' : 'theme-dark bg-black text-white';
+
+    // --- Grid Renderer ---
+    const renderProductGrid = (items, title, id, isHorizontalScroll = false) => {
+        if (id === 'featured-grid' && loading) {
+            return (
+                <div className="text-center py-32 flex flex-col items-center">
+                    <Loader2 className="animate-spin w-10 h-10 text-[#CCFF00] mb-4" />
+                    <p className="font-mono text-xs uppercase tracking-widest text-gray-500">Initializing Storefront...</p>
+                </div>
+            );
+        }
+        if (items.length === 0) return null;
+
+        if (isHorizontalScroll) {
+            return (
+                <section id={id} className={`my-20 border-t border-white/5 pt-16`}>
+                    <div className="flex justify-between items-end px-4 md:px-8 mb-10 max-w-[1600px] mx-auto">
+                        <h2 className="font-display text-3xl md:text-4xl uppercase text-white tracking-tight">
+                            {title}
+                        </h2>
+                        <div className="hidden md:flex items-center gap-2">
+                            <span className="w-2 h-2 bg-[#CCFF00] rounded-full animate-pulse" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Live Stock</span>
+                        </div>
+                    </div>
+                    <div className="flex space-x-6 overflow-x-scroll pb-8 scrollbar-hide px-4 md:px-8">
+                        {items.map((product) => (
+                            <div key={product.id}>
+                                <HorizontalProductCard
+                                    product={product}
+                                    currentCurrency={currentCurrency}
+                                    addToCart={addToCart}
+                                    setProductId={setProductId}
+                                    setNotification={setNotification}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            );
+        }
+
+        return (
+            <section id={id} className={`pt-4 px-4 md:px-8 ${id === 'sale-grid' ? 'mt-20 mb-4' : 'my-20'}`}>
+                <div className="flex flex-col items-center mb-12 text-center">
+                    <h2 className="font-display text-4xl md:text-5xl uppercase text-white tracking-tighter">
+                        {title}
+                    </h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-[1600px] mx-auto">
+                    {items.map((product) => (
+                        <ProductCard
+                            key={product.id}
+                            product={product}
+                            currentCurrency={currentCurrency}
+                            addToCart={addToCart}
+                            setProductId={setProductId}
+                            setNotification={setNotification}
+                        />
+                    ))}
+                </div>
+            </section>
+        );
+    };
+
+    return (
+        <div className={`min-h-screen ${themeClass}`}>
+            {!settings.heroSlogan && loading ? (
+                <div className="h-screen w-full flex items-center justify-center bg-black">
+                    <Loader2 className="animate-spin text-[#CCFF00]" size={40} />
+                </div>
+            ) : (
+                <>
+                    <HeroSection settings={settings} />
+                    <ScrollingBanner settings={settings} />
+
+                    <div className="pb-8">
+                        {renderProductGrid(featuredItems, settings.featuredSectionTitle || 'FEATURED DRIPS', 'featured-grid', false)}
+
+                        {(featuredItems.length > 0 || (isNewArrivalsVisible && newArrivalItems.length > 0)) && (
+                            <div className="text-center my-16">
+                                <button
+                                    onClick={() => navigate('/collections')}
+                                    className="inline-flex items-center gap-4 font-display text-lg uppercase tracking-widest border border-white/20 text-white px-8 py-4 rounded-full font-bold hover:bg-[#CCFF00] hover:text-black hover:border-[#CCFF00] transition-all duration-300"
+                                >
+                                    Browse Full Catalog <ArrowRight size={18} />
+                                </button>
+                            </div>
+                        )}
+
+                        {isNewArrivalsVisible && renderProductGrid(newArrivalItems, settings.newArrivalsTitle || 'LATEST DROPS', 'new-arrivals-row', true)}
+
+                        <ImageGallery settings={settings} />
+
+                        {isSaleItemsVisible && renderProductGrid(saleItems, settings.saleSectionTitle || 'THE VAULT', 'sale-grid', false)}
+                    </div>
+
+                    {bottomBannerImages.length > 0 && (
+                        <section className="mt-4 pt-12 border-t border-white/10 bg-[#050505]">
+                            <div className="flex flex-col items-center mb-10">
+                                <RefreshCw className="text-[var(--accent)] mb-4 animate-spin-slow" size={32} />
+                                <h2 className="font-display text-4xl md:text-5xl uppercase text-white text-center tracking-tight">
+                                    {settings.processSectionTitle || 'THE MOULDING PROCESS'}
+                                </h2>
+                                <p className="text-gray-500 font-mono text-xs uppercase tracking-[0.2em] mt-2">
+                                    {settings.processSubTitle || 'Behind the scenes engineering'}
+                                </p>
+                            </div>
+                            <ImageSlideshow images={bottomBannerImages} interval={7000} />
+                        </section>
+                    )}
+                </>
+            )}
+        </div>
+    );
+};
