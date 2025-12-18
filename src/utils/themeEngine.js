@@ -5,7 +5,7 @@ export const THEMES = {
         accent: '#CCFF00',
         bg: '#000000',
         card: '#111111',
-        headerBg: '#000000',
+        headerBg: '#080808',
         headerText: '#FFFFFF',
         headerStyle: 'dark'
     },
@@ -63,7 +63,7 @@ export const applyTheme = (themeKey, fontKey) => {
     const font = FONT_STYLES[fontKey] || FONT_STYLES['style-a'];
     const root = document.documentElement;
 
-    // Apply Colors
+    // Apply Colors to CSS Variables
     root.style.setProperty('--accent-color', theme.accent);
     root.style.setProperty('--bg-color', theme.bg);
     root.style.setProperty('--card-bg', theme.card);
@@ -71,9 +71,13 @@ export const applyTheme = (themeKey, fontKey) => {
     root.style.setProperty('--header-text', theme.headerText);
     root.style.setProperty('--text-color', theme.headerStyle === 'dark' ? '#FFFFFF' : '#000000');
 
-    // Apply Fonts
+    // Apply Fonts to CSS Variables
     root.style.setProperty('--font-heading', font.heading);
     root.style.setProperty('--font-body', font.body);
 
-    return theme.headerStyle; // Return this to help App.jsx swap the logo
+    // Update Data Attributes for CSS targeting
+    root.setAttribute('data-theme', themeKey);
+    document.body.setAttribute('data-theme', themeKey);
+
+    return theme.headerStyle;
 };

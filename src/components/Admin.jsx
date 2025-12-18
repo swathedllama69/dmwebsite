@@ -5,7 +5,7 @@ import {
     LayoutGrid, ShoppingBag, Settings, Search, Lock, ChevronUp, ChevronDown, RefreshCw,
     Loader2, Save, Zap, AlertCircle, ArrowLeft, X, Star, ToggleLeft, ToggleRight,
     Video, Type, DollarSign, Image as ImageIcon, Receipt, CheckCircle, User as UserIcon,
-    Globe, Percent, ShieldCheck, Link, Eye, EyeOff, Terminal, Layers, Sliders, Palette
+    Globe, Percent, ShieldCheck, Link, Eye, EyeOff, Terminal, Layers, Sliders, Palette, RotateCcw,
 } from 'lucide-react';
 
 import { API_BASE_URL, formatCurrency } from '../utils/config.js';
@@ -132,6 +132,7 @@ const SettingsPanel = ({ settings, fetchSettings, setNotification }) => {
             setFormData({
                 ...settings,
                 active_theme: settings.active_theme || 'devolt-punk',
+                active_font_style: settings.active_font_style || 'style-a', // New field
                 heroSlogan: settings.heroSlogan || '',
                 heroSubHeadline: settings.heroSubHeadline || '',
                 heroVideoUrl: settings.heroVideoUrl || '',
@@ -163,9 +164,13 @@ const SettingsPanel = ({ settings, fetchSettings, setNotification }) => {
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
-        // Immediate local preview
+
+        // Immediate local preview for Theme & Fonts
         if (name === 'active_theme') {
             document.documentElement.setAttribute('data-theme', value);
+        }
+        if (name === 'active_font_style') {
+            document.documentElement.setAttribute('data-font', value);
         }
     };
 
@@ -195,6 +200,28 @@ const SettingsPanel = ({ settings, fetchSettings, setNotification }) => {
         } finally { setIsSaving(false); }
     };
 
+    const handleGlobalReset = async () => {
+        if (window.confirm("CRITICAL: Reset all theme and typography settings to Devolt Punk default?")) {
+            setIsSaving(true);
+            const resetData = {
+                active_theme: 'devolt-punk',
+                active_font_style: 'style-a'
+            };
+            try {
+                await Promise.all(Object.keys(resetData).map(key =>
+                    fetch(`${API_BASE_URL}/settings.php`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ setting_key: key, setting_value: resetData[key] })
+                    })
+                ));
+                window.location.reload();
+            } catch (err) {
+                setNotification({ message: "RESET FAILED", type: 'error' });
+            }
+        }
+    };
+
     // --- STYLING MACROS ---
     const sectionTitleStyle = "text-[10px] font-black text-[#CCFF00] mb-6 flex items-center gap-2 uppercase tracking-[0.3em] drop-shadow-[0_0_10px_rgba(204,255,0,0.6)]";
     const cardStyle = "bg-[#111] border border-white/5 rounded-2xl p-6 shadow-2xl transition-all hover:border-[#CCFF00]/30 hover:shadow-[0_0_40px_rgba(204,255,0,0.05)] relative overflow-hidden";
@@ -213,17 +240,24 @@ const SettingsPanel = ({ settings, fetchSettings, setNotification }) => {
                     <p className="text-[#CCFF00] font-mono text-[10px] mt-1 uppercase tracking-widest opacity-80 animate-pulse drop-shadow-[0_0_5px_#CCFF00]">Master Controller Active</p>
                 </div>
 
-                <div className="flex items-center gap-3 bg-[#111] p-1 rounded-2xl border border-white/5 shadow-xl">
-                    <div className="flex items-center gap-4 px-4 py-2">
-                        <div className="flex flex-col">
-                            <span className="text-[8px] text-gray-500 font-black uppercase">USD Rate</span>
-                            <input name="rateUSD" className="bg-transparent text-[#CCFF00] font-mono text-xs w-14 outline-none border-b border-white/10 focus:border-[#CCFF00]" value={formData.rateUSD || ''} onChange={handleChange} />
+                <div className="flex items-center gap-3">
+                    {/* Reset Button */}
+                    <button onClick={handleGlobalReset} className="flex items-center gap-2 px-4 py-2 border border-red-500/30 text-red-500 rounded-xl text-[9px] font-black uppercase hover:bg-red-500 hover:text-white transition-all">
+                        <RotateCcw size={12} /> Emergency Reset
+                    </button>
+
+                    <div className="flex items-center gap-3 bg-[#111] p-1 rounded-2xl border border-white/5 shadow-xl">
+                        <div className="flex items-center gap-4 px-4 py-2">
+                            <div className="flex flex-col">
+                                <span className="text-[8px] text-gray-500 font-black uppercase">USD Rate</span>
+                                <input name="rateUSD" className="bg-transparent text-[#CCFF00] font-mono text-xs w-14 outline-none border-b border-white/10 focus:border-[#CCFF00]" value={formData.rateUSD || ''} onChange={handleChange} />
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-[8px] text-gray-500 font-black uppercase">GBP Rate</span>
+                                <input name="rateGBP" className="bg-transparent text-[#CCFF00] font-mono text-xs w-14 outline-none border-b border-white/10 focus:border-[#CCFF00]" value={formData.rateGBP || ''} onChange={handleChange} />
+                            </div>
+                            <Globe size={14} className="text-[#CCFF00] drop-shadow-[0_0_8px_#CCFF00]" />
                         </div>
-                        <div className="flex flex-col">
-                            <span className="text-[8px] text-gray-500 font-black uppercase">GBP Rate</span>
-                            <input name="rateGBP" className="bg-transparent text-[#CCFF00] font-mono text-xs w-14 outline-none border-b border-white/10 focus:border-[#CCFF00]" value={formData.rateGBP || ''} onChange={handleChange} />
-                        </div>
-                        <Globe size={14} className="text-[#CCFF00] drop-shadow-[0_0_8px_#CCFF00]" />
                     </div>
                 </div>
             </div>
@@ -236,9 +270,25 @@ const SettingsPanel = ({ settings, fetchSettings, setNotification }) => {
                         <h3 className={sectionTitleStyle}><Palette size={14} className="text-[#CCFF00]" /> 00. Interface Skin</h3>
                         <label className={labelStyle}>Active System Theme</label>
                         <div className="grid grid-cols-2 gap-2 mt-4">
-                            {['devolt-punk', 'noor', 'trumpsucks', 'royal-volt'].map(t => (
+                            {['devolt-punk', 'devolt-chrome', 'night-ops', 'voltage', 'infinity'].map(t => (
                                 <button key={t} onClick={() => handleChange({ target: { name: 'active_theme', value: t } })} className={themeBtnStyle(formData.active_theme === t)}>
                                     {t.replace('-', ' ')}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className={cardStyle}>
+                        <h3 className={sectionTitleStyle}><Type size={14} className="text-[#CCFF00]" /> 00.1 Typography</h3>
+                        <label className={labelStyle}>Font style pairing</label>
+                        <div className="grid grid-cols-1 gap-2 mt-4">
+                            {[
+                                { id: 'style-a', label: 'Option A: Industrial Mono' },
+                                { id: 'style-b', label: 'Option B: Hype Sans' },
+                                { id: 'style-c', label: 'Option C: Luxury Cinzel' }
+                            ].map(f => (
+                                <button key={f.id} onClick={() => handleChange({ target: { name: 'active_font_style', value: f.id } })} className={themeBtnStyle(formData.active_font_style === f.id)}>
+                                    {f.label}
                                 </button>
                             ))}
                         </div>
@@ -259,14 +309,6 @@ const SettingsPanel = ({ settings, fetchSettings, setNotification }) => {
                                 <label className={labelStyle}>Sub-Headline</label>
                                 <textarea name="heroSubHeadline" className={`${inputStyle} h-24`} value={formData.heroSubHeadline || ''} onChange={handleChange} />
                             </div>
-                        </div>
-                    </div>
-
-                    <div className={cardStyle}>
-                        <h3 className={sectionTitleStyle}><Layers size={14} className="text-[#CCFF00]" /> 02. Home Slideshow</h3>
-                        <div className="space-y-4">
-                            <label className={labelStyle}>Slideshow Images (CSV)</label>
-                            <textarea name="homeSlideshowImages" className={textAreaCSV} value={formData.homeSlideshowImages || ''} onChange={handleChange} placeholder="Comma separated URLs..." />
                         </div>
                     </div>
                 </div>
@@ -308,6 +350,14 @@ const SettingsPanel = ({ settings, fetchSettings, setNotification }) => {
 
                             <label className={labelStyle}>Gallery Target Links (CSV)</label>
                             <textarea name="galleryLinks" className={textAreaCSV} value={formData.galleryLinks || ''} onChange={handleChange} placeholder="/product1, /product2..." />
+                        </div>
+                    </div>
+
+                    <div className={cardStyle}>
+                        <h3 className={sectionTitleStyle}><Layers size={14} className="text-[#CCFF00]" /> 02. Home Slideshow</h3>
+                        <div className="space-y-4">
+                            <label className={labelStyle}>Slideshow Images (CSV)</label>
+                            <textarea name="homeSlideshowImages" className={textAreaCSV} value={formData.homeSlideshowImages || ''} onChange={handleChange} placeholder="Comma separated URLs..." />
                         </div>
                     </div>
                 </div>
