@@ -2,30 +2,56 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 1. THEME VARIABLE DEFINITIONS 
-  These are the "slots" that will be filled by the database values in Step 4.
-  Defaults are set to the "Devolt Punk" theme.
-*/
-:root {
-  /* Colors */
-  --accent-color: #CCFF00;
-  /* Replaces the hardcoded Lime */
-  --bg-color: #000000;
-  /* Main page background */
-  --card-bg: #111111;
-  /* Product/Admin card background */
-  --text-color: #FFFFFF;
-  /* Primary text color */
+@layer base {
 
-  /* Header Specifics */
-  --header-bg: #000000;
-  /* Nav background */
-  --header-text: #FFFFFF;
-  /* Nav text & "DEVOLT" logo color */
+  /* 1. DEFAULT (LIGHT MODE) 
+     This preserves the "beautiful" look you like on white backgrounds. 
+  */
+  :root {
+    /* Colors */
+    --accent-color: #CCFF00;
 
-  /* Fonts - Options A, B, and C will be injected here via JS */
-  --font-heading: 'Space Grotesk', sans-serif;
-  --font-body: 'JetBrains Mono', monospace;
+    /* Light Mode Backgrounds */
+    --bg-color: #ffffff;
+    --card-bg: #ffffff;
+
+    /* Light Mode Text */
+    --text-color: #09090b;
+    --border-color: #e4e4e7;
+    /* Light gray border for structure */
+
+    /* Header Specifics */
+    --header-bg: #ffffff;
+    --header-text: #09090b;
+
+    /* Fonts */
+    --font-heading: 'Space Grotesk', sans-serif;
+    --font-body: 'JetBrains Mono', monospace;
+  }
+
+  /* 2. DARK MODE OVERRIDES (The "All Black" Logic)
+     When the system is dark, we force everything to black/dark gray. 
+     No more white boxes.
+  */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      /* Main Page is Black */
+      --bg-color: #000000;
+
+      /* Cards are ALSO Black (or very dark gray), not White */
+      --card-bg: #000000;
+
+      /* Text flips to White */
+      --text-color: #ffffff;
+
+      /* Borders become visible to define shapes since bg and card are both black */
+      --border-color: #333333;
+
+      /* Header adapts */
+      --header-bg: #000000;
+      --header-text: #ffffff;
+    }
+  }
 }
 
 /* 2. GLOBAL STYLES */
@@ -33,10 +59,17 @@ body {
   background-color: var(--bg-color);
   color: var(--text-color);
   font-family: var(--font-body);
-  /* Standard body text */
   transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s ease;
   margin: 0;
   min-height: 100vh;
+}
+
+/* 3. UTILITY CLASSES */
+/* Apply this class to your cards instead of 'bg-white' */
+.card-theme {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
 }
 
 /* Force headings to use the heading font variable */
@@ -48,22 +81,20 @@ h4,
   font-family: var(--font-heading);
 }
 
-/* 3. DYNAMIC UTILITIES */
+/* 4. ANIMATIONS & DYNAMIC UTILITIES */
 .animated-cyber-grid {
-  /* Updated to use the variable accent color instead of hardcoded #CCFF00 */
+  /* Uses variable accent color */
   background-image: radial-gradient(circle, var(--accent-color) 1px, transparent 1px);
   background-size: 50px 50px;
   background-repeat: repeat;
   animation: pulse-grid 8s infinite ease-in-out;
 }
 
-/* Logo and Header text color logic */
 .nav-text-dynamic {
   color: var(--header-text);
   transition: color 0.3s ease;
 }
 
-/* --- Keep your existing animations below --- */
 @keyframes spin-slow {
   from {
     transform: rotate(0deg);

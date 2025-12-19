@@ -1,87 +1,73 @@
 import React from 'react';
-import { Mail, Phone, Send, Clock, Globe } from 'lucide-react'; // Added Clock and Globe for standard info
+import { Mail, Phone, Send, Clock, Globe, MapPin } from 'lucide-react';
 
 export const ContactPage = () => {
-    // Defined contact info
     const phoneNumber = '+2348146068754';
     const supportEmail = 'info@devoltmould.com.ng';
 
+    const info = [
+        { icon: <Phone size={18} />, label: "Direct Line", val: phoneNumber, link: `tel:${phoneNumber}` },
+        { icon: <Mail size={18} />, label: "Support Node", val: supportEmail, link: `mailto:${supportEmail}` },
+        { icon: <Clock size={18} />, label: "Uptime", val: "Mon-Fri: 9AM - 5PM (WAT)", link: null },
+    ];
+
     return (
-        <div className="max-w-4xl mx-auto pt-32 pb-16 px-4 font-mono text-white">
-            <h1 className="font-display text-5xl uppercase text-[#CCFF00] mb-6 border-b border-[#333] pb-3">
-                <Mail size={48} className="inline mr-3" /> Get in Touch
-            </h1>
+        <div className="max-w-6xl mx-auto pt-32 pb-24 px-4 font-mono text-current">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                {/* Contact Details */}
-                <div className="space-y-6">
-                    <h2 className="text-2xl font-bold uppercase text-white mb-4">Contact Information</h2>
+                {/* Visual Side */}
+                <div className="flex flex-col justify-center">
+                    <h1 className="font-display text-6xl md:text-8xl uppercase italic tracking-tighter mb-6 leading-none">
+                        GET IN<br /><span className="text-primary">TOUCH</span>
+                    </h1>
+                    <p className="text-lg opacity-60 mb-10 max-w-md">
+                        Have a technical inquiry or a custom mould project? Our engineering team is ready to assist.
+                    </p>
 
-                    {/* Updated Phone Number */}
-                    <div className="flex items-center space-x-3 text-gray-400">
-                        <Phone size={20} className="text-[#CCFF00] flex-shrink-0" />
-                        <a href={`tel:${phoneNumber}`} className="hover:text-white transition-colors">
-                            {phoneNumber}
-                        </a>
+                    <div className="space-y-6">
+                        {info.map((item, i) => (
+                            <div key={i} className="flex items-center gap-4 group">
+                                <div className="p-3 bg-card border border-white/5 rounded-xl text-primary group-hover:bg-primary group-hover:text-black transition-all">
+                                    {item.icon}
+                                </div>
+                                <div>
+                                    <p className="text-[10px] uppercase opacity-40 font-black tracking-widest">{item.label}</p>
+                                    {item.link ? (
+                                        <a href={item.link} className="text-lg hover:text-primary transition-colors">{item.val}</a>
+                                    ) : (
+                                        <p className="text-lg">{item.val}</p>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
                     </div>
-
-                    {/* Updated Email Address */}
-                    <div className="flex items-center space-x-3 text-gray-400">
-                        <Mail size={20} className="text-[#CCFF00] flex-shrink-0" />
-                        <a href={`mailto:${supportEmail}`} className="hover:text-white transition-colors">
-                            {supportEmail}
-                        </a>
-                    </div>
-
-                    {/* Additional standard info (replaces address) */}
-                    <div className="flex items-start space-x-3 text-gray-400">
-                        <Clock size={20} className="text-[#CCFF00] flex-shrink-0 mt-1" />
-                        <p>Mon - Fri: 9:00 AM - 5:00 PM (WAT)</p>
-                    </div>
-                    <div className="flex items-start space-x-3 text-gray-400">
-                        <Globe size={20} className="text-[#CCFF00] flex-shrink-0 mt-1" />
-                        <p>Serving Customers Worldwide</p>
-                    </div>
-
-                    <p className='pt-4 text-sm text-[#888]'>For technical support or large-volume inquiries, please use the contact form.</p>
                 </div>
 
-                {/* Contact Form (Set to mailto: action) */}
-                <div className="bg-[#1a1a1a] p-6 rounded-lg border border-[#333]">
-                    <h2 className="text-2xl font-bold uppercase text-white mb-4">Send Us a Message</h2>
-                    {/* NOTE: Using mailto: for basic functionality. Full submission requires a backend API. */}
-                    <form
-                        action={`mailto:${supportEmail}`}
-                        method="POST"
-                        encType="text/plain"
-                        className="space-y-4"
-                    >
-                        <input
-                            type="text"
-                            name="Name"
-                            placeholder="Your Name"
-                            className="w-full p-3 bg-black border border-[#333] text-white rounded focus:ring-1 focus:ring-[#CCFF00]"
-                            required
-                        />
-                        <input
-                            type="email"
-                            name="Email"
-                            placeholder="Your Email"
-                            className="w-full p-3 bg-black border border-[#333] text-white rounded focus:ring-1 focus:ring-[#CCFF00]"
-                            required
-                        />
-                        <textarea
-                            rows="4"
-                            name="Message"
-                            placeholder="Your Message"
-                            className="w-full p-3 bg-black border border-[#333] text-white rounded focus:ring-1 focus:ring-[#CCFF00]"
-                            required
-                        ></textarea>
-                        <button
-                            type="submit"
-                            className="inline-flex items-center justify-center w-full gap-2 bg-[#CCFF00] text-black px-6 py-3 rounded font-bold uppercase hover:bg-white transition-colors"
-                        >
-                            Send Message <Send size={20} />
+                {/* Form Side */}
+                <div className="bg-card border border-white/5 p-8 md:p-12 rounded-[2.5rem] shadow-2xl relative">
+                    <div className="absolute top-6 right-8 text-[10px] font-black opacity-20 uppercase tracking-widest">Secure Form v2.0</div>
+
+                    <form action={`mailto:${supportEmail}`} method="POST" encType="text/plain" className="space-y-6">
+                        <div className="space-y-2">
+                            <label className="text-[10px] uppercase font-black opacity-40 ml-2">Identity</label>
+                            <input type="text" name="Name" placeholder="Full Name" required
+                                className="w-full p-4 bg-black/20 dark:bg-white/5 border border-white/10 rounded-2xl focus:border-primary outline-none transition-all" />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-[10px] uppercase font-black opacity-40 ml-2">Digital Address</label>
+                            <input type="email" name="Email" placeholder="email@address.com" required
+                                className="w-full p-4 bg-black/20 dark:bg-white/5 border border-white/10 rounded-2xl focus:border-primary outline-none transition-all" />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-[10px] uppercase font-black opacity-40 ml-2">Inquiry Details</label>
+                            <textarea rows="4" name="Message" placeholder="Describe your project requirements..." required
+                                className="w-full p-4 bg-black/20 dark:bg-white/5 border border-white/10 rounded-2xl focus:border-primary outline-none transition-all resize-none" />
+                        </div>
+
+                        <button type="submit" className="w-full bg-primary text-black py-5 rounded-2xl font-black uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-[0_20px_40px_-10px_var(--accent-color)] flex items-center justify-center gap-3">
+                            Transmit Message <Send size={20} />
                         </button>
                     </form>
                 </div>

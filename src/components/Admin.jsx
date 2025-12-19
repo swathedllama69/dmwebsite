@@ -121,6 +121,100 @@ const OrdersTable = ({ currentCurrency, navigate, setNotification }) => {
     );
 };
 
+// --- USER REVIEWS MANAGEMENT PANEL ---
+const AdminReviewsPanel = ({ setNotification }) => {
+    const [reviews, setReviews] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    const fetchAllReviews = useCallback(async () => {
+        setLoading(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/reviews.php?action=list_all`);
+            const data = await response.json();
+            setReviews(Array.isArray(data) ? data : []);
+        } catch (e) {
+            setNotification({ message: "REVIEW_SYNC_FAILED", type: 'error' });
+        } finally {
+            setLoading(false);
+        }
+    }, [setNotification]);
+
+    useEffect(() => { fetchAllReviews(); }, [fetchAllReviews]);
+
+    const deleteReview = async (id) => {
+        if (!window.confirm("PERMANENTLY DELETE THIS USER REVIEW?")) return;
+        try {
+            const response = await fetch(`${API_BASE_URL}/reviews.php?id=${id}`, { method: 'DELETE' });
+            if (response.ok) {
+                setNotification({ message: "REVIEW_REMOVED", type: 'success' });
+                fetchAllReviews();
+            }
+        } catch (e) {
+            setNotification({ message: "DELETE_FAILED", type: 'error' });
+        }
+    };
+
+    return (
+        <div className="space-y-6 animate-in fade-in duration-500">
+            <header className="flex justify-between items-center">
+                <div>
+                    <h2 className="font-display text-3xl uppercase italic tracking-tighter text-white">
+                        User_Review_Repository <span className="text-primary ml-2 font-mono text-sm not-italic opacity-50">[{reviews.length}]</span>
+                    </h2>
+                    <p className="text-[10px] font-mono text-gray-500 uppercase tracking-widest mt-1">Manage customer feedback and ratings</p>
+                </div>
+                <button onClick={fetchAllReviews} className="flex items-center gap-2 font-mono text-[10px] font-black uppercase text-[#888] hover:text-white transition-colors bg-white/5 px-4 py-2 rounded-lg border border-white/5">
+                    <RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> Refresh_Data
+                </button>
+            </header>
+
+            <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl overflow-hidden shadow-2xl overflow-x-auto">
+                <table className="min-w-full divide-y divide-white/5">
+                    <thead className="bg-white/5">
+                        <tr className="text-left text-[9px] font-black uppercase text-gray-500 tracking-widest">
+                            <th className="px-6 py-5">Product_ID</th>
+                            <th className="px-6 py-5">Customer</th>
+                            <th className="px-6 py-5">Rating</th>
+                            <th className="px-6 py-5">Feedback</th>
+                            <th className="px-6 py-5">Submitted_At</th>
+                            <th className="px-6 py-5 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                        {reviews.map((r) => (
+                            <tr key={r.id} className="hover:bg-white/[0.02] transition-colors text-[11px] font-mono">
+                                <td className="px-6 py-4 text-primary font-black">UNIT_{r.product_id}</td>
+                                <td className="px-6 py-4 text-white font-bold">{r.user_name}</td>
+                                <td className="px-6 py-4">
+                                    <div className="flex gap-1">
+                                        {[...Array(5)].map((_, i) => (
+                                            <Star key={i} size={10} className={i < r.rating ? "text-primary fill-primary" : "text-gray-800"} strokeWidth={0} />
+                                        ))}
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 text-gray-400 max-w-sm">
+                                    <span className="line-clamp-2 italic">"{r.comment}"</span>
+                                </td>
+                                <td className="px-6 py-4 text-gray-600">{r.created_at}</td>
+                                <td className="px-6 py-4 text-right">
+                                    <button onClick={() => deleteReview(r.id)} className="text-red-500/50 hover:text-red-500 p-2 transition-colors">
+                                        <Trash2 size={16} />
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                {reviews.length === 0 && !loading && (
+                    <div className="p-20 text-center text-gray-700 font-mono uppercase text-[10px] tracking-[0.3em]">
+                        Database_Empty: No_User_Reviews_Found
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 // --- UPGRADED & COMPREHENSIVE SETTINGS PANEL ---
 const SettingsPanel = ({ settings, fetchSettings, setNotification }) => {
     const [formData, setFormData] = useState({});
@@ -631,45 +725,33 @@ export const AdminDashboard = ({
 
     return (
         <div className="max-w-[1600px] mx-auto pt-24 pb-12 px-4 md:px-8 min-h-screen text-white bg-[#080808]">
-            {/* --- UNIQUE BRANDED HEADER --- */}
+            {/* --- CLEAN DYNAMIC HEADER (NO LOGO) --- */}
             <header className="flex flex-col md:flex-row justify-between items-center mb-12 border-b border-white/5 pb-8 gap-6 relative overflow-hidden">
-                <div className="absolute -left-2 -top-6 opacity-[0.02] text-[120px] font-black italic pointer-events-none select-none tracking-tighter uppercase">ARCHITECT</div>
-                <button onClick={() => navigate('/admin')} className="flex items-center gap-5 group transition-all relative z-10">
+                <div className="flex flex-col group transition-all relative z-10">
                     <div className="relative">
-                        <div className="absolute inset-0 bg-[#CCFF00] blur-2xl opacity-0 group-hover:opacity-20 transition-opacity"></div>
-                        <div className="w-14 h-14 bg-black border border-white/10 flex items-center justify-center rounded-2xl group-hover:border-[#CCFF00]/50 transition-all shadow-2xl overflow-hidden">
-                            <img src={DEVOLT_LOGO_URL} alt="Devolt" className="w-10 h-10 relative z-10 object-contain" onError={(e) => {
-                                e.target.style.display = 'none';
-                                const fb = document.createElement('div');
-                                fb.className = "text-[#CCFF00] font-black text-2xl italic";
-                                fb.innerText = "D.M";
-                                e.target.parentNode.appendChild(fb);
-                            }} />
-                        </div>
-                    </div>
-                    <div className="flex flex-col">
-                        <div className="relative">
-                            <span className="absolute -top-4 -left-2 text-[40px] font-black text-white/[0.03] select-none tracking-tighter uppercase italic">MOULD</span>
-                            <h1 className="relative z-10 font-display text-3xl font-black uppercase tracking-tighter italic text-white group-hover:text-[#CCFF00] transition-colors">
-                                <span className="text-[#CCFF00] mr-1">/</span>DEVOLT<span className="text-[#CCFF00]">.</span>ADMIN
-                            </h1>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1 px-3 py-0.5 bg-[#CCFF00]/5 border border-[#CCFF00]/10 rounded-full">
-                            <div className="w-1.5 h-1.5 rounded-full bg-[#CCFF00] animate-pulse shadow-[0_0_8px_#CCFF00]"></div>
-                            <span className="text-[8px] font-black text-[#CCFF00] uppercase tracking-[0.2em]">System Architect Active</span>
-                        </div>
-                    </div>
-                </button>
+                        {/* Subtle background text for depth */}
+                        <span className="absolute -top-10 -left-4 text-[10px] font-black text-primary/[0.03] select-none tracking-tighter uppercase italic pointer-events-none">
+                            ARCHITECT
+                        </span>
 
-                <div className="flex items-center gap-8 relative z-10">
-                    <div className="hidden lg:block text-right border-r border-white/10 pr-6">
-                        <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest leading-none mb-1">Control Node</p>
-                        <p className="text-xs font-mono text-[#CCFF00] opacity-80 uppercase">Station_01_Active</p>
+                        <h1 className="relative z-10 font-display text-4xl font-black uppercase tracking-tighter italic text-white group-hover:text-primary transition-colors duration-500">
+                            <span className="text-primary mr-1">/</span>
+                            DEVOLT<span className="text-primary">.</span>ADMIN
+                        </h1>
                     </div>
-                    <button onClick={handleLogout} className="flex items-center gap-3 bg-white/5 hover:bg-red-500/10 border border-white/5 hover:border-red-500/20 px-6 py-3.5 rounded-2xl transition-all group">
-                        <LogOut size={16} className="text-gray-500 group-hover:text-red-500 transition-colors" />
-                        <span className="font-black text-[10px] uppercase tracking-widest text-gray-400 group-hover:text-white transition-colors">Logout</span>
-                    </button>
+
+                    <div className="flex items-center gap-2 mt-2 px-3 py-1 bg-primary/5 border border-primary/10 rounded-full w-fit">
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_8px_var(--accent-color)]"></div>
+                        <span className="text-[8px] font-black text-primary uppercase tracking-[0.2em]">
+                            System_Architect_Node_01
+                        </span>
+                    </div>
+                </div>
+
+                {/* Right side is now empty/clean as the global nav handles logout */}
+                <div className="hidden md:block text-right">
+                    <p className="text-[9px] font-black text-gray-600 uppercase tracking-[0.3em] leading-none mb-1 font-mono">Status</p>
+                    <p className="text-xs font-mono text-primary opacity-80 uppercase tracking-tighter">Secure_Session_Active</p>
                 </div>
             </header>
 
@@ -679,13 +761,26 @@ export const AdminDashboard = ({
                         { key: 'dashboard', name: 'Dashboard', icon: LayoutDashboard },
                         { key: 'products', name: 'Products', icon: Package },
                         { key: 'orders', name: 'Orders', icon: ShoppingBag },
-                        { key: 'receipts', name: 'Payments Review', icon: Receipt },
+                        { key: 'reviews', name: 'User Reviews', icon: Star },
+                        { key: 'receipts', name: 'Payments', icon: Receipt },
                         { key: 'settings', name: 'Settings', icon: Settings },
-                        { key: 'users', name: 'Users Directory', icon: UserIcon }
+                        { key: 'users', name: 'Users', icon: UserIcon }
                     ].map(tab => (
                         <li key={tab.key}>
-                            <button onClick={() => setActiveTab(tab.key)} className={`flex items-center gap-2 px-6 py-4 font-black text-[10px] uppercase tracking-[0.2em] transition-all ${activeTab === tab.key ? 'text-[#CCFF00] border-b-2 border-[#CCFF00]' : 'text-[#888] hover:text-white'}`}>
-                                <tab.icon size={16} /> {tab.name}
+                            <button
+                                onClick={() => setActiveTab(tab.key)}
+                                className={`flex items-center gap-2 px-6 py-4 font-black text-[10px] uppercase tracking-[0.2em] transition-all relative
+                    ${activeTab === tab.key
+                                        ? 'text-primary'
+                                        : 'text-gray-500 hover:text-white'}`}
+                            >
+                                <tab.icon size={14} />
+                                {tab.name}
+
+                                {/* Dynamic underline indicator */}
+                                {activeTab === tab.key && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary shadow-[0_0_10px_var(--accent-color)] animate-in fade-in slide-in-from-bottom-1" />
+                                )}
                             </button>
                         </li>
                     ))}
@@ -745,6 +840,7 @@ export const AdminDashboard = ({
                 {activeTab === 'orders' && <OrdersTable currentCurrency={currentCurrency} navigate={navigate} setNotification={setNotification} />}
                 {activeTab === 'receipts' && <AdminReceiptsView currentCurrency={currentCurrency} setNotification={setNotification} />}
                 {activeTab === 'users' && <AdminUsersView />}
+                {activeTab === 'reviews' && <AdminReviewsPanel setNotification={setNotification} />}
                 {activeTab === 'settings' && <SettingsPanel settings={settings} fetchSettings={fetchSettings} setNotification={setNotification} />}
             </main>
 

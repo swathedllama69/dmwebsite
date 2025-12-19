@@ -1,45 +1,39 @@
 import React from 'react';
-import { Truck, Clock, Package } from 'lucide-react';
+import { Truck, Clock, Package, CreditCard, ShieldCheck } from 'lucide-react';
 
 export const ShippingPolicy = () => {
     return (
-        <div className="max-w-4xl mx-auto pt-32 pb-16 px-4 font-mono text-white">
-            <h1 className="font-display text-5xl uppercase text-[#CCFF00] mb-6 border-b border-[#333] pb-3">
-                <Truck size={48} className="inline mr-3" /> Shipping Policy
-            </h1>
+        <div className="max-w-4xl mx-auto pt-32 pb-24 px-4 font-mono text-current">
+            <header className="mb-12 border-l-4 border-primary pl-6">
+                <h1 className="font-display text-5xl md:text-7xl uppercase italic tracking-tighter mb-4 leading-none">
+                    Shipping<span className="text-primary">.</span>Info
+                </h1>
+                <p className="text-lg opacity-60 italic">Movement and delivery protocols for your orders.</p>
+            </header>
 
-            <p className="text-lg text-gray-300 mb-8">
-                We are committed to delivering your precision components efficiently and securely worldwide.
-            </p>
-
-            <div className="space-y-8">
-                <div>
-                    <h2 className="text-2xl font-bold uppercase text-white mb-3 flex items-center">
-                        <Clock size={20} className="mr-2 text-[#CCFF00]" /> Processing Time
-                    </h2>
-                    <p className="text-gray-400">
-                        Standard orders are processed and shipped within 1-2 business days. Custom or large-volume mould fabrication orders may require 5-10 business days for production before shipment.
-                    </p>
+            <div className="grid grid-cols-1 gap-6 mb-12">
+                {/* Logistics Info Box */}
+                <div className="bg-primary/10 border border-primary/20 p-8 rounded-[2rem] flex flex-col md:flex-row gap-6 items-center shadow-[0_0_30px_var(--accent-color)]/10">
+                    <CreditCard size={40} className="text-primary shrink-0" />
+                    <div>
+                        <h2 className="text-xl font-black uppercase mb-2">Logistics is a separate settlement</h2>
+                        <p className="text-sm opacity-80 leading-relaxed">
+                            To ensure the most accurate rates, shipping costs are not included in your checkout total. Once your order is processed, our team will coordinate with you to determine the best delivery route. <strong>Shipping fees are settled independently prior to dispatch.</strong>
+                        </p>
+                    </div>
                 </div>
 
-                <div>
-                    <h2 className="text-2xl font-bold uppercase text-white mb-3">
-                        Delivery Options & Rates
-                    </h2>
-                    <ul className="list-disc list-inside text-gray-400 pl-4 space-y-2">
-                        <li>**Standard (3-7 Business Days):** Calculated at checkout based on weight and destination.</li>
-                        <li>**Express (1-2 Business Days):** Flat rate for rapid turnaround, available only for in-stock components.</li>
-                        <li>**International:** Rates and delivery times vary (typically 7-21 days), subject to customs clearance.</li>
-                    </ul>
-                </div>
-
-                <div>
-                    <h2 className="text-2xl font-bold uppercase text-white mb-3 flex items-center">
-                        <Package size={20} className="mr-2 text-[#CCFF00]" /> Tracking
-                    </h2>
-                    <p className="text-gray-400">
-                        All shipments include tracking information, which will be emailed to you upon dispatch. Please allow up to 24 hours for the tracking link to become active.
-                    </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-card border border-white/5 p-8 rounded-3xl shadow-xl group">
+                        <Clock size={24} className="text-primary mb-4 group-hover:animate-pulse" />
+                        <h3 className="font-black uppercase mb-2">Handling</h3>
+                        <p className="text-sm opacity-60">Standard releases are prepared within 1-3 business days. Specialty or made-to-order items may require additional time for preparation before leaving the lab.</p>
+                    </div>
+                    <div className="bg-card border border-white/5 p-8 rounded-3xl shadow-xl group">
+                        <ShieldCheck size={24} className="text-primary mb-4" />
+                        <h3 className="font-black uppercase mb-2">Transit</h3>
+                        <p className="text-sm opacity-60">We utilize a network of global couriers to ensure secure delivery. Full tracking documentation is provided as soon as your order is handed over to the logistics partner.</p>
+                    </div>
                 </div>
             </div>
         </div>

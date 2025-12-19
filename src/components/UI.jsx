@@ -2,8 +2,8 @@ import React, { useEffect } from 'react';
 import { ShoppingBag, Loader2, AlertCircle, CheckCircle, Save } from 'lucide-react';
 
 export const GlobalStyles = ({ settings }) => {
-    // We extract the custom styles from admin settings, or use defaults
-    const primaryColor = settings?.primaryColor || '#CCFF00';
+    // Use the accent color from database, or fallback to the CSS variable
+    const primaryColor = settings?.accent_color || 'var(--accent-color)';
     const borderRadius = settings?.borderRadius || '12px';
     const heroOpacity = (settings?.heroOverlayOpacity || 50) / 100;
 
@@ -12,7 +12,8 @@ export const GlobalStyles = ({ settings }) => {
         @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@300;400;700&display=swap');
         
         :root {
-            --primary: ${primaryColor};
+            /* Syncing the settings-driven primary to our main accent variable */
+            --accent-color: ${primaryColor};
             --radius-main: ${borderRadius};
             --hero-opacity: ${heroOpacity};
         }
@@ -20,22 +21,17 @@ export const GlobalStyles = ({ settings }) => {
         .font-display { font-family: 'Archivo Black', sans-serif; }
         .font-mono { font-family: 'JetBrains Mono', monospace; }
         
-        /* Update your components to use the variables */
-        .bg-primary { background-color: var(--primary); }
-        .text-primary { color: var(--primary); }
-        .border-primary { border-color: var(--primary); }
-        
-        /* Custom Scrollbar */
+        /* Custom Scrollbar - Now Dynamic */
         ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #080808; }
-        ::-webkit-scrollbar-thumb { background: #333; }
-        ::-webkit-scrollbar-thumb:hover { background: #CCFF00; }    
+        ::-webkit-scrollbar-track { background: var(--bg-color); }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-color); }    
 
-        ::selection { background: var(--primary); color: #000; }
+        ::selection { background: var(--accent-color); color: #000; }
 
         /* The Animated Cyber Grid now uses the variable */
         .animated-cyber-grid {
-            background-image: radial-gradient(circle, var(--primary) 1px, transparent 1px);
+            background-image: radial-gradient(circle, var(--accent-color) 1px, transparent 1px);
             background-size: 30px 30px;
         }
         `}</style>
@@ -57,28 +53,39 @@ export const NotificationToast = ({ notification, setNotification }) => {
 
     const { message, type } = notification;
 
-    let bgColor, icon, iconColor;
+    // We define specific styles based on the type to ensure high contrast
+    let containerStyles = '';
+    let icon, iconColorClass;
 
     switch (type) {
         case 'success':
-            bgColor = 'bg-[#CCFF00]';
+            // Accent background, Black text (always legible)
+            containerStyles = 'bg-[var(--accent-color)] border-transparent text-black';
             icon = CheckCircle;
-            iconColor = 'text-black';
+            iconColorClass = 'text-black';
             break;
+
         case 'error':
-            bgColor = 'bg-red-600';
+            // Red background, White text
+            containerStyles = 'bg-red-600 border-transparent text-white';
             icon = AlertCircle;
-            iconColor = 'text-white';
+            iconColorClass = 'text-white';
             break;
+
         case 'cart':
-            bgColor = 'bg-blue-600';
+            // Blue background, White text
+            containerStyles = 'bg-blue-600 border-transparent text-white';
             icon = ShoppingBag;
-            iconColor = 'text-white';
+            iconColorClass = 'text-white';
             break;
+
         default:
-            bgColor = 'bg-[#111]';
+            // DEFAULT (The Fix): 
+            // Uses CSS Variables so it's White in Light Mode, and Black in Dark Mode.
+            // Adds a border so the Black card is visible against the Black background.
+            containerStyles = 'bg-[var(--card-bg)] border-[var(--border-color)] text-[var(--text-color)]';
             icon = Save;
-            iconColor = 'text-[#CCFF00]';
+            iconColorClass = 'text-[var(--text-color)]'; // Icon matches text color
             break;
     }
 
@@ -86,8 +93,8 @@ export const NotificationToast = ({ notification, setNotification }) => {
 
     return (
         <div className="fixed top-20 right-4 z-[110] transition-transform duration-300 ease-out animate-in slide-in-from-right max-w-sm">
-            <div className={`p-4 rounded-lg shadow-2xl border ${bgColor} font-mono text-sm flex items-start gap-3 ${type === 'success' ? 'text-black' : 'text-white'}`}>
-                <IconComponent size={20} className={`mt-0.5 ${iconColor}`} />
+            <div className={`p-4 rounded-lg shadow-2xl border font-mono text-sm flex items-start gap-3 ${containerStyles}`}>
+                <IconComponent size={20} className={`mt-0.5 ${iconColorClass}`} />
                 <span className="font-bold whitespace-normal break-words">{message}</span>
             </div>
         </div>

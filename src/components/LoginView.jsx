@@ -1,18 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Mail, Lock, LogIn, Send, Loader2, AlertCircle, RefreshCcw, ArrowLeft, ShieldCheck } from 'lucide-react';
+import { User, Mail, Lock, LogIn, Send, Loader2, AlertCircle, RefreshCcw, ShieldCheck, X } from 'lucide-react';
 import { API_BASE_URL } from '../utils/config';
 
-export const LoginView = ({ setIsCustomerLoggedIn, setCustomerData, setNotification, navigateToAccount }) => {
+// Added isModal and onClose props
+export const LoginView = ({ setIsCustomerLoggedIn, setCustomerData, setNotification, navigateToAccount, isModal = false, onClose }) => {
     const navigate = useNavigate();
-
-    // Mode state: 'login', 'register', or 'forgot_password'
     const [mode, setMode] = useState('login');
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-
     const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
     const [loading, setLoading] = useState(false);
     const [localError, setLocalError] = useState('');
@@ -20,9 +18,6 @@ export const LoginView = ({ setIsCustomerLoggedIn, setCustomerData, setNotificat
     const isRegisterMode = mode === 'register';
     const isForgotPasswordMode = mode === 'forgot_password';
 
-    // UI Helpers
-    const inputContainerStyle = "relative group transition-all duration-300";
-    const iconStyle = "absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-[#CCFF00] transition-colors duration-300";
     const inputStyle = "w-full bg-black/40 border border-[#333] hover:border-[#444] text-white py-4 pl-12 pr-4 rounded-2xl outline-none focus:border-[#CCFF00] focus:ring-1 focus:ring-[#CCFF00]/50 transition-all duration-300 placeholder:text-gray-600 font-mono text-sm";
 
     const handleAuthAction = async (e) => {
@@ -30,21 +25,9 @@ export const LoginView = ({ setIsCustomerLoggedIn, setCustomerData, setNotificat
         setLoading(true);
         setLocalError('');
 
-        let endpoint = `${API_BASE_URL}/login.php`;
-        let payload = { email, password };
-
-        if (isRegisterMode) {
-            if (password !== confirmPassword) {
-                setLocalError("Passwords do not match.");
-                setLoading(false);
-                return;
-            }
-            endpoint = `${API_BASE_URL}/auth.php?action=register`;
-            payload = { name, email, password };
-        } else if (isForgotPasswordMode) {
-            endpoint = `${API_BASE_URL}/reset_password_request.php`;
-            payload = { email: forgotPasswordEmail };
-        }
+        const action = isForgotPasswordMode ? 'reset' : (isRegisterMode ? 'register' : 'login');
+        const endpoint = isForgotPasswordMode ? `${API_BASE_URL}/reset_password_request.php` : `${API_BASE_URL}/users.php?action=${action}`;
+        const payload = isForgotPasswordMode ? { email: forgotPasswordEmail } : { action, email, password, ...(isRegisterMode && { name }) };
 
         try {
             const response = await fetch(endpoint, {
@@ -52,171 +35,69 @@ export const LoginView = ({ setIsCustomerLoggedIn, setCustomerData, setNotificat
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
             });
-
             const data = await response.json();
-
-            if (!response.ok || !data.success) {
-                throw new Error(data.error || "Authentication failed.");
-            }
+            if (!response.ok || !data.success) throw new Error(data.error || "Authentication failed.");
 
             if (isForgotPasswordMode) {
-                setNotification({ message: data.message, type: 'success' });
+                setNotification({ message: data.message || "Reset link sent.", type: 'success' });
                 setMode('login');
             } else {
+                const userData = data.user || { name: data.name, email: data.email, user_id: data.user_id };
                 setIsCustomerLoggedIn(true);
-                setCustomerData({
-                    name: data.name,
-                    email: data.email,
-                    user_id: data.user_id,
-                });
-                setNotification({ message: `Access Granted. Welcome, ${data.name}`, type: 'success' });
-                navigateToAccount();
+                setCustomerData(userData);
+                localStorage.setItem('customer_user', JSON.stringify(userData));
+
+                setNotification({ message: `Welcome back, ${userData.name}`, type: 'success' });
+
+                if (isModal) {
+                    onClose(); // Close modal if logged in successfully
+                } else {
+                    navigateToAccount();
+                }
             }
-        } catch (err) {
-            setLocalError(err.message);
-        } finally {
-            setLoading(false);
-        }
+        } catch (err) { setLocalError(err.message); } finally { setLoading(false); }
     };
 
     return (
-        <div className="min-h-screen bg-[#080808] pt-40 pb-20 px-6 flex flex-col items-center animate-in fade-in duration-700">
-            {/* Header Branding */}
-            <div className="text-center mb-10">
+        <div className={isModal ? "w-full max-w-[420px] bg-[#080808] p-8 rounded-[2.5rem] border border-white/10 relative shadow-2xl" : "min-h-screen bg-[#080808] pt-44 pb-20 px-6 flex flex-col items-center"}>
+            {isModal && (
+                <button onClick={onClose} className="absolute top-6 right-6 text-gray-500 hover:text-white transition-colors">
+                    <X size={24} />
+                </button>
+            )}
+
+            <div className="text-center mb-8">
                 <div className="inline-flex p-3 rounded-2xl bg-[#CCFF00]/10 border border-[#CCFF00]/20 mb-4">
-                    <ShieldCheck className="text-[#CCFF00]" size={32} />
+                    <ShieldCheck className="text-[#CCFF00]" size={28} />
                 </div>
-                <h1 className="text-5xl font-display uppercase text-white tracking-tighter italic">
+                <h1 className="text-3xl font-black uppercase text-white tracking-tighter italic">
                     {isForgotPasswordMode ? 'Recover' : isRegisterMode ? 'Enlist' : 'Access'}
                 </h1>
-                <p className="text-gray-500 font-mono text-[10px] uppercase tracking-[0.3em] mt-2">
-                    Devolt Mould Terminal v2.0
-                </p>
             </div>
 
-            <div className="w-full max-w-[420px]">
-                {/* Error Banner */}
-                {localError && (
-                    <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-2xl text-xs font-mono mb-6 animate-in slide-in-from-top-2">
-                        <AlertCircle size={18} className="shrink-0" />
-                        <span>{localError}</span>
-                    </div>
+            {localError && (
+                <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-2xl text-[10px] font-mono mb-6">
+                    <AlertCircle size={16} /> <span>{localError}</span>
+                </div>
+            )}
+
+            <form onSubmit={handleAuthAction} className="space-y-4">
+                {isRegisterMode && (
+                    <div className="relative"><User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} /><input type="text" placeholder="NAME" value={name} onChange={e => setName(e.target.value)} className={inputStyle} required /></div>
+                )}
+                <div className="relative"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} /><input type="email" placeholder="EMAIL" value={isForgotPasswordMode ? forgotPasswordEmail : email} onChange={e => isForgotPasswordMode ? setForgotPasswordEmail(e.target.value) : setEmail(e.target.value)} className={inputStyle} required /></div>
+                {!isForgotPasswordMode && (
+                    <div className="relative"><Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} /><input type="password" placeholder="PASSWORD" value={password} onChange={e => setPassword(e.target.value)} className={inputStyle} required /></div>
                 )}
 
-                <form onSubmit={handleAuthAction} className="space-y-4">
-                    {/* Input Groups */}
-                    {isRegisterMode && (
-                        <div className={inputContainerStyle}>
-                            <User className={iconStyle} size={18} />
-                            <input
-                                type="text"
-                                placeholder="IDENTIFICATION (FULL NAME)"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                className={inputStyle}
-                                required
-                            />
-                        </div>
-                    )}
+                <button type="submit" disabled={loading} className="w-full bg-[#CCFF00] hover:bg-white text-black py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all mt-4 flex items-center justify-center gap-2">
+                    {loading ? <Loader2 size={18} className="animate-spin" /> : "Authorize"}
+                </button>
+            </form>
 
-                    {!isForgotPasswordMode ? (
-                        <>
-                            <div className={inputContainerStyle}>
-                                <Mail className={iconStyle} size={18} />
-                                <input
-                                    type="email"
-                                    placeholder="EMAIL ADDRESS"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className={inputStyle}
-                                    required
-                                />
-                            </div>
-                            <div className={inputContainerStyle}>
-                                <Lock className={iconStyle} size={18} />
-                                <input
-                                    type="password"
-                                    placeholder="SECURE PASSWORD"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className={inputStyle}
-                                    required
-                                />
-                            </div>
-                            {isRegisterMode && (
-                                <div className={inputContainerStyle}>
-                                    <Lock className={iconStyle} size={18} />
-                                    <input
-                                        type="password"
-                                        placeholder="CONFIRM PASSWORD"
-                                        value={confirmPassword}
-                                        onChange={(e) => setConfirmPassword(e.target.value)}
-                                        className={inputStyle}
-                                        required
-                                    />
-                                </div>
-                            )}
-                        </>
-                    ) : (
-                        <div className={inputContainerStyle}>
-                            <Mail className={iconStyle} size={18} />
-                            <input
-                                type="email"
-                                placeholder="REGISTERED EMAIL"
-                                value={forgotPasswordEmail}
-                                onChange={(e) => setForgotPasswordEmail(e.target.value)}
-                                className={inputStyle}
-                                required
-                            />
-                        </div>
-                    )}
-
-                    {/* Submit Button */}
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full bg-[#CCFF00] hover:bg-white text-black py-5 rounded-2xl font-black uppercase text-sm tracking-widest transition-all duration-500 flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-50 mt-8"
-                    >
-                        {loading ? (
-                            <Loader2 size={20} className="animate-spin" />
-                        ) : (
-                            <>
-                                {isForgotPasswordMode ? <RefreshCcw size={18} /> : isRegisterMode ? <Send size={18} /> : <LogIn size={18} />}
-                                {isForgotPasswordMode ? 'Request Link' : isRegisterMode ? 'Initialize' : 'Authenticate'}
-                            </>
-                        )}
-                    </button>
-                </form>
-
-                {/* Footer Controls */}
-                <div className="mt-10 flex flex-col items-center gap-6">
-                    {!isForgotPasswordMode && !isRegisterMode && (
-                        <button
-                            onClick={() => setMode('forgot_password')}
-                            className="text-[10px] text-gray-500 hover:text-[#CCFF00] font-mono uppercase tracking-[0.2em] transition-colors"
-                        >
-                            Reset Credentials?
-                        </button>
-                    )}
-
-                    <div className="h-[1px] w-full bg-[#333]"></div>
-
-                    <button
-                        onClick={() => {
-                            setMode(isRegisterMode || isForgotPasswordMode ? 'login' : 'register');
-                            setLocalError('');
-                        }}
-                        className="group flex items-center gap-3 text-sm font-mono uppercase tracking-tight"
-                    >
-                        <span className="text-gray-500 group-hover:text-gray-300">
-                            {isRegisterMode || isForgotPasswordMode ? 'Return to' : 'New Terminal User?'}
-                        </span>
-                        <span className="text-[#CCFF00] font-black group-hover:underline underline-offset-4">
-                            {isRegisterMode || isForgotPasswordMode ? 'Authentication' : 'Register'}
-                        </span>
-                    </button>
-                </div>
-            </div>
+            <button onClick={() => setMode(isRegisterMode ? 'login' : 'register')} className="w-full text-center mt-6 text-[10px] font-mono text-gray-500 uppercase hover:text-[#CCFF00] transition-colors">
+                {isRegisterMode ? 'Already **Enlisted? Login' : 'New Identity? Register Here'}
+            </button>
         </div>
     );
 };

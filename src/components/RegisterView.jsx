@@ -1,219 +1,248 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { User, Mail, Lock, LogIn, Send, Loader2, AlertCircle, RefreshCcw, ShieldCheck } from 'lucide-react';
-import { API_BASE_URL } from '../utils/config';
+import { Mail, Lock, User, ArrowRight, ShieldCheck, Eye, EyeOff, Loader2, Sparkles, ArrowLeft, KeyRound } from 'lucide-react';
+import clsx from 'clsx';
 
-export const LoginView = ({ setIsCustomerLoggedIn, setCustomerData, setNotification, navigateToAccount }) => {
-    const navigate = useNavigate();
+const API_BASE_URL = '/api';
 
-    // Mode state: 'login', 'register', or 'forgot_password'
-    const [mode, setMode] = useState('login');
-    const [name, setName] = useState('');
+export const LoginView = ({
+    isModal,
+    onClose,
+    setIsCustomerLoggedIn,
+    setCustomerData,
+    setNotification,
+    navigateToAccount
+}) => {
+    // Views: 'login', 'register', 'forgot_password', 'reset_password'
+    const [view, setView] = useState('login');
+    const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+
+    // Form Data
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
 
-    const [loading, setLoading] = useState(false);
-    const [localError, setLocalError] = useState('');
+    // Reset Flow Data
+    const [resetToken, setResetToken] = useState('');
+    const [newPassword, setNewPassword] = useState('');
 
-    const isRegisterMode = mode === 'register';
-    const isForgotPasswordMode = mode === 'forgot_password';
-
-    // UI Styles
-    const inputContainerStyle = "relative group transition-all duration-300";
-    const iconStyle = "absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-[#CCFF00] transition-colors duration-300";
-    const inputStyle = "w-full bg-black/40 border border-[#333] hover:border-[#444] text-white py-4 pl-12 pr-4 rounded-2xl outline-none focus:border-[#CCFF00] focus:ring-1 focus:ring-[#CCFF00]/50 transition-all duration-300 placeholder:text-gray-600 font-mono text-sm";
-
-    const handleAuthAction = async (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setLocalError('');
-        if (setNotification) setNotification(null);
-
-        // Validation Logic
-        if (isRegisterMode) {
-            if (!name) { setLocalError("Name is required."); setLoading(false); return; }
-            if (password.length < 8) { setLocalError("Security requires 8+ characters."); setLoading(false); return; }
-            if (password !== confirmPassword) { setLocalError("Passwords mismatch."); setLoading(false); return; }
-        }
-
-        const action = isForgotPasswordMode ? 'reset' : (isRegisterMode ? 'register' : 'login');
-        let endpoint = isForgotPasswordMode
-            ? `${API_BASE_URL}/reset_password_request.php`
-            : `${API_BASE_URL}/users.php?action=${action}`;
-
-        const payload = isForgotPasswordMode
-            ? { email: forgotPasswordEmail }
-            : { action, email, password, ...(isRegisterMode && { name }) };
 
         try {
-            const response = await fetch(endpoint, {
+            let endpoint = '';
+            let payload = {};
+
+            // 1. Configure Request based on View
+            if (view === 'login') {
+                endpoint = 'login';
+                payload = { email, password };
+            } else if (view === 'register') {
+                endpoint = 'register';
+                payload = { email, password, first_name: firstName, last_name: lastName };
+            } else if (view === 'forgot_password') {
+                endpoint = 'request_reset';
+                payload = { email };
+            } else if (view === 'reset_password') {
+                endpoint = 'confirm_reset';
+                payload = { token: resetToken, new_password: newPassword };
+            }
+
+            // 2. Send Request
+            const response = await fetch(`${API_BASE_URL}/auth.php?action=${endpoint}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
+                body: JSON.stringify(payload)
             });
 
             const data = await response.json();
 
-            if (!response.ok || !data.success) {
-                throw new Error(data.error || "Authentication failed.");
+            if (!data.success) {
+                throw new Error(data.error || "Operation failed");
             }
 
-            if (isForgotPasswordMode) {
-                setNotification({ message: data.message || "Reset link sent to your email.", type: 'success' });
-                setMode('login');
+            // 3. Handle Success Scenarios
+            if (view === 'forgot_password') {
+                setNotification({ message: "Reset code sent (Check Console for Dev Token)", type: 'success' });
+                // DEV HELP: Log token to console so you can copy it
+                if (data.dev_token) console.log("DEV TOKEN:", data.dev_token);
+                setView('reset_password'); // Move to next step
+            } else if (view === 'reset_password') {
+                setNotification({ message: "Password reset successful! Please login.", type: 'success' });
+                setView('login');
             } else {
-                const userData = data.user || { name: data.name, email: data.email, user_id: data.user_id };
-                setIsCustomerLoggedIn(true);
-                setCustomerData(userData);
-                localStorage.setItem('customer_user', JSON.stringify(userData));
-
+                // Login or Register Success
                 setNotification({
-                    message: isRegisterMode ? "Account created successfully. Welcome." : `Welcome back, ${userData.name}`,
+                    message: view === 'login' ? "Login Successful" : "Account Created",
                     type: 'success'
                 });
+                setIsCustomerLoggedIn(true);
+                setCustomerData(data.user);
+                if (isModal) onClose();
                 navigateToAccount();
             }
+
         } catch (err) {
-            setLocalError(err.message);
+            console.error("Auth Error:", err);
+            setNotification({ message: err.message, type: 'error' });
         } finally {
             setLoading(false);
         }
     };
 
+    // Helper to render title based on view
+    const getTitle = () => {
+        if (view === 'login') return "Welcome Back";
+        if (view === 'register') return "Create Account";
+        if (view === 'forgot_password') return "Reset Password";
+        return "New Credentials";
+    };
+
     return (
-        <div className="min-h-screen bg-[#080808] pt-44 pb-20 px-6 flex flex-col items-center">
-            {/* Brand Header */}
-            <div className="text-center mb-12 animate-in fade-in zoom-in duration-700">
-                <div className="inline-flex p-4 rounded-3xl bg-[#CCFF00]/10 border border-[#CCFF00]/20 mb-6 shadow-[0_0_30px_rgba(204,255,0,0.1)]">
-                    <ShieldCheck className="text-[#CCFF00]" size={36} />
-                </div>
-                <h1 className="text-5xl font-black uppercase text-white tracking-tighter italic font-display">
-                    {isForgotPasswordMode ? 'Recover' : isRegisterMode ? 'Enlist' : 'Access'}
-                </h1>
-                <p className="text-gray-500 font-mono text-[10px] uppercase tracking-[0.4em] mt-3">
-                    {isForgotPasswordMode ? 'Reset your password' : isRegisterMode ? 'Register a new account' : 'Safely Login to your account'}
-                </p>
-            </div>
+        <div className={clsx(
+            "relative w-full overflow-hidden transition-all duration-500",
+            isModal ? "bg-card/90 backdrop-blur-2xl rounded-[2.5rem] border border-white/10 shadow-2xl p-8 md:p-12"
+                : "max-w-md mx-auto pt-32 pb-16 px-6"
+        )}>
+            {/* Background Glow */}
+            <div className="absolute -top-24 -left-24 w-48 h-48 bg-primary/20 blur-[100px] rounded-full" />
 
-            <div className="w-full max-w-[420px] animate-in slide-in-from-bottom-8 duration-700">
-                {localError && (
-                    <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-2xl text-xs font-mono mb-6">
-                        <AlertCircle size={18} className="shrink-0" />
-                        <span>{localError}</span>
+            <div className="relative z-10">
+                {/* Header */}
+                <div className="text-center mb-8">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-black border border-white/10 mb-6 shadow-xl">
+                        {view.includes('reset') || view === 'forgot_password' ? (
+                            <KeyRound size={32} className="text-primary" />
+                        ) : (
+                            <ShieldCheck size={32} className="text-primary" />
+                        )}
                     </div>
-                )}
+                    <h2 className="font-display text-3xl font-bold uppercase tracking-tight text-current">
+                        {getTitle()}
+                    </h2>
+                </div>
 
-                <form onSubmit={handleAuthAction} className="space-y-4">
-                    {isRegisterMode && (
-                        <div className={inputContainerStyle}>
-                            <User className={iconStyle} size={18} />
+                <form onSubmit={handleSubmit} className="space-y-4">
+
+                    {/* --- VIEW: REGISTER ONLY --- */}
+                    {view === 'register' && (
+                        <div className="grid grid-cols-2 gap-3">
+                            <input type="text" placeholder="First Name" className="bg-black/20 border border-white/5 p-4 rounded-2xl w-full text-sm outline-none focus:border-primary"
+                                value={firstName} onChange={e => setFirstName(e.target.value)} required />
+                            <input type="text" placeholder="Last Name" className="bg-black/20 border border-white/5 p-4 rounded-2xl w-full text-sm outline-none focus:border-primary"
+                                value={lastName} onChange={e => setLastName(e.target.value)} required />
+                        </div>
+                    )}
+
+                    {/* --- VIEW: LOGIN / REGISTER / FORGOT --- */}
+                    {view !== 'reset_password' && (
+                        <div className="relative group">
+                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30 group-focus-within:text-primary transition-colors" size={18} />
                             <input
-                                type="text"
-                                placeholder="FULL NAME"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                className={inputStyle}
+                                type="email"
+                                placeholder="Email Address"
+                                className="w-full bg-black/20 border border-white/5 p-4 pl-12 rounded-2xl outline-none focus:border-primary transition-all text-sm"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
                                 required
                             />
                         </div>
                     )}
 
-                    {!isForgotPasswordMode ? (
+                    {/* --- VIEW: LOGIN / REGISTER ONLY --- */}
+                    {(view === 'login' || view === 'register') && (
                         <>
-                            <div className={inputContainerStyle}>
-                                <Mail className={iconStyle} size={18} />
+                            <div className="relative group">
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30 group-focus-within:text-primary transition-colors" size={18} />
                                 <input
-                                    type="email"
-                                    placeholder="EMAIL ADDRESS"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className={inputStyle}
-                                    required
-                                />
-                            </div>
-                            <div className={inputContainerStyle}>
-                                <Lock className={iconStyle} size={18} />
-                                <input
-                                    type="password"
-                                    placeholder="PASSWORD"
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder="Password"
+                                    className="w-full bg-black/20 border border-white/5 p-4 pl-12 pr-12 rounded-2xl outline-none focus:border-primary transition-all text-sm"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className={inputStyle}
                                     required
                                 />
+                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 opacity-30 hover:opacity-100">
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
                             </div>
-                            {isRegisterMode && (
-                                <div className={inputContainerStyle}>
-                                    <Lock className={iconStyle} size={18} />
-                                    <input
-                                        type="password"
-                                        placeholder="CONFIRM PASSWORD"
-                                        value={confirmPassword}
-                                        onChange={(e) => setConfirmPassword(e.target.value)}
-                                        className={inputStyle}
-                                        required
-                                    />
+                            {/* Forgot Password Link */}
+                            {view === 'login' && (
+                                <div className="text-right">
+                                    <button
+                                        type="button"
+                                        onClick={() => setView('forgot_password')}
+                                        className="text-[10px] uppercase font-bold opacity-40 hover:opacity-100 hover:text-primary transition-all"
+                                    >
+                                        Forgot Password?
+                                    </button>
                                 </div>
                             )}
                         </>
-                    ) : (
-                        <div className={inputContainerStyle}>
-                            <Mail className={iconStyle} size={18} />
-                            <input
-                                type="email"
-                                placeholder="ENTER YOUR REGISTERED EMAIL"
-                                value={forgotPasswordEmail}
-                                onChange={(e) => setForgotPasswordEmail(e.target.value)}
-                                className={inputStyle}
-                                required
-                            />
-                        </div>
                     )}
 
+                    {/* --- VIEW: RESET PASSWORD (STEP 2) --- */}
+                    {view === 'reset_password' && (
+                        <>
+                            <div className="relative group">
+                                <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30 group-focus-within:text-primary transition-colors" size={18} />
+                                <input
+                                    type="text"
+                                    placeholder="Enter Reset Token"
+                                    className="w-full bg-black/20 border border-white/5 p-4 pl-12 rounded-2xl outline-none focus:border-primary transition-all text-sm font-mono"
+                                    value={resetToken}
+                                    onChange={(e) => setResetToken(e.target.value)}
+                                    required
+                                />
+                            </div>
+                            <div className="relative group">
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30 group-focus-within:text-primary transition-colors" size={18} />
+                                <input
+                                    type="password"
+                                    placeholder="New Password"
+                                    className="w-full bg-black/20 border border-white/5 p-4 pl-12 rounded-2xl outline-none focus:border-primary transition-all text-sm"
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    required
+                                />
+                            </div>
+                        </>
+                    )}
+
+                    {/* Submit Button */}
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-[#CCFF00] hover:bg-white text-black py-5 rounded-2xl font-black uppercase text-sm tracking-widest transition-all duration-500 flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-50 mt-8 shadow-xl shadow-[#CCFF00]/10"
+                        className="w-full bg-primary text-black py-5 rounded-2xl font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-3 shadow-[0_15px_30px_-10px_var(--accent-color)] hover:scale-[1.02] active:scale-95 transition-all mt-6 disabled:opacity-50"
                     >
-                        {loading ? (
-                            <Loader2 size={20} className="animate-spin" />
-                        ) : (
-                            <>
-                                {isForgotPasswordMode ? <RefreshCcw size={18} /> : isRegisterMode ? <Send size={18} /> : <LogIn size={18} />}
-                                {isForgotPasswordMode ? 'Send Reset Link' : isRegisterMode ? 'Register Account' : 'Secure Login'}
-                            </>
-                        )}
+                        {loading ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={18} />}
+                        {view === 'login' && "Sign In"}
+                        {view === 'register' && "Create Account"}
+                        {view === 'forgot_password' && "Send Reset Code"}
+                        {view === 'reset_password' && "Set New Password"}
                     </button>
                 </form>
 
-                <div className="mt-10 flex flex-col items-center gap-6">
-                    {!isForgotPasswordMode && !isRegisterMode && (
+                {/* Footer Navigation */}
+                <div className="mt-8 text-center space-y-3">
+                    {view !== 'login' && (
                         <button
-                            onClick={() => setMode('forgot_password')}
-                            className="text-[10px] text-gray-500 hover:text-[#CCFF00] font-mono uppercase tracking-[0.2em] transition-colors"
+                            onClick={() => setView('login')}
+                            className="text-[10px] font-bold uppercase tracking-widest opacity-40 hover:opacity-100 hover:text-primary transition-all flex items-center justify-center gap-2 mx-auto"
                         >
-                            Forgot Password? Click here
+                            <ArrowLeft size={12} /> Back to Login
                         </button>
                     )}
-
-                    <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-[#333] to-transparent"></div>
-
-                    <button
-                        onClick={() => {
-                            setMode(isRegisterMode || isForgotPasswordMode ? 'login' : 'register');
-                            setLocalError('');
-                        }}
-                        className="group flex items-center gap-3 text-sm font-mono uppercase tracking-tight"
-                    >
-                        <span className="text-gray-500 group-hover:text-gray-300 transition-colors">
-                            {isRegisterMode || isForgotPasswordMode ? 'Go back to' : 'New User?'}
-                        </span>
-                        <span className="text-[#CCFF00] font-black group-hover:underline underline-offset-4 transition-all">
-                            {isRegisterMode || isForgotPasswordMode ? 'Login Screen' : 'Register Here'}
-                        </span>
-                    </button>
+                    {view === 'login' && (
+                        <button
+                            onClick={() => setView('register')}
+                            className="text-[10px] font-bold uppercase tracking-widest opacity-40 hover:opacity-100 hover:text-primary transition-all flex items-center justify-center gap-2 mx-auto"
+                        >
+                            Don't have an account? Sign Up <ArrowRight size={12} />
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
