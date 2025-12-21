@@ -1,548 +1,280 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Save, ArrowLeft, Loader2 as Loader, Upload, Trash2, Image as ImageIcon, Star, AlertTriangle, X } from 'lucide-react';
+import {
+    Save, ArrowLeft, Loader2 as Loader, Upload, Trash2,
+    Image as ImageIcon, Star, AlertTriangle, X, Plus,
+    ChevronRight, Info, Tag, DollarSign, Link as LinkIcon
+} from 'lucide-react';
 import { API_BASE_URL } from '../utils/config.js';
 
-// --- Custom Warning Modal Component (for No Image Check) ---
-const WarningModal = ({ isOpen, onClose, onConfirm }) => {
+// --- Custom Dynamic Warning Modal ---
+const WarningModal = ({ isOpen, onClose, onConfirm, title, message, type = 'warning' }) => {
     if (!isOpen) return null;
+    const isError = type === 'error';
 
     return (
-        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
-            <div className="bg-[#111] p-8 rounded-lg shadow-2xl border border-yellow-700 max-w-sm w-full relative">
-                <button onClick={onClose} className="absolute top-3 right-3 text-[#888] hover:text-white transition-colors">
+        <div className="fixed inset-0 bg-black/70 z-[200] flex items-center justify-center p-4 backdrop-blur-md">
+            <div className="bg-card p-8 rounded-2xl shadow-2xl border border-current/10 max-w-sm w-full relative text-current animate-in zoom-in-95 duration-200">
+                <button onClick={onClose} className="absolute top-4 right-4 opacity-40 hover:opacity-100 transition-colors">
                     <X size={20} />
                 </button>
-                <AlertTriangle className="text-yellow-500 mx-auto mb-4" size={32} />
-                <h3 className="font-display text-2xl text-white uppercase mb-4 text-center">No Image Warning</h3>
-                <p className="font-mono text-sm text-[#888] text-center mb-6">
-                    You have not provided any valid external image URLs. Do you wish to save changes without a primary image?
-                </p>
-                <div className="flex justify-center gap-4">
-                    <button
-                        onClick={onClose}
-                        className="font-mono text-sm px-4 py-2 rounded text-[#888] hover:text-white transition-colors"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={onConfirm}
-                        className={`flex items-center gap-2 bg-yellow-600 text-black px-6 py-2 rounded font-bold hover:bg-yellow-700 transition-colors uppercase tracking-wide font-mono`}
-                    >
-                        Yes, Save Anyway
-                    </button>
+                <div className="flex flex-col items-center text-center">
+                    <div className={`w-16 h-16 ${isError ? 'bg-red-500/10 text-red-500' : 'bg-yellow-500/10 text-yellow-500'} rounded-full flex items-center justify-center mb-6`}>
+                        {isError ? <X size={32} /> : <AlertTriangle size={32} />}
+                    </div>
+                    <h3 className="font-display text-2xl uppercase mb-2 tracking-tighter">{title}</h3>
+                    <p className="font-mono text-[10px] opacity-60 mb-8 leading-relaxed uppercase tracking-wider">{message}</p>
+                    <div className="flex w-full gap-3">
+                        <button onClick={onClose} className="flex-1 font-mono text-[10px] font-black uppercase py-3 rounded-xl bg-current/5 hover:bg-current/10 border border-current/10 transition-all">Cancel</button>
+                        {!isError && (
+                            <button onClick={onConfirm} className="flex-1 font-mono text-[10px] font-black uppercase py-3 rounded-xl bg-primary text-black hover:opacity-90 transition-all shadow-lg">Confirm</button>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
     );
 };
 
-// Utility function to check if a URL is a valid external HTTP/HTTPS link
-const isValidHttpUrl = (string) => {
-    let url;
-    try {
-        url = new URL(string);
-    } catch (_) {
-        return false;
-    }
-    return url.protocol === "http:" || url.protocol === "https:";
-}
-
 export const EditProduct = ({ setNotification }) => {
     const { id } = useParams();
     const navigate = useNavigate();
 
-    // Core State
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState(null);
-    const [product, setProduct] = useState(null);
-
-    // UI/Image State
-    const [dragActive, setDragActive] = useState(false);
     const [newImageUrl, setNewImageUrl] = useState('');
-    const [isWarningModalOpen, setIsWarningModalOpen] = useState(false); // NEW: Modal state
-    const [pendingPayload, setPendingPayload] = useState(null); // NEW: Pending payload state
+    const [modalConfig, setModalConfig] = useState({ open: false, title: '', message: '', type: 'warning' });
+
+    const [previews, setPreviews] = useState([]);
+    const [selectedFiles, setSelectedFiles] = useState([]);
+    const [externalUrls, setExternalUrls] = useState([]);
 
     const [formData, setFormData] = useState({
-        name: '',
-        price: '',
-        stock: '',
-        description: '',
-        category: 'Men',
-        subCategory: '',
-        on_sale: false,
-        sale_price: '',
-        is_featured: false,
-        images: ''
+        name: '', price: '', stock: '', description: '',
+        category: 'Men', subCategory: '', on_sale: false,
+        sale_price: '', is_featured: false
     });
 
-    // --- 1. FETCH PRODUCT DATA BY ID ---
     const fetchProduct = useCallback(async () => {
         setLoading(true);
-        setError(null);
         try {
             const response = await fetch(`${API_BASE_URL}/products.php?id=${id}`);
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`HTTP error! status: ${response.status}. ${errorText.substring(0, 100)}...`);
-            }
             const data = await response.json();
-
             if (data && data.length > 0) {
-                setProduct(data[0]);
-            } else {
-                setError("Product not found. Check if ID exists or API endpoint is correct.");
+                const product = data[0];
+                setFormData({
+                    name: product.name || '',
+                    description: product.description || '',
+                    category: product.category || 'Men',
+                    subCategory: product.sub_category || '',
+                    price: product.price ? product.price.toString() : '',
+                    on_sale: product.on_sale === true || product.on_sale === 1 || product.on_sale === '1',
+                    sale_price: product.sale_price ? product.sale_price.toString() : '',
+                    stock: product.stock || 0,
+                    is_featured: product.is_featured === true || product.is_featured === 1 || product.is_featured === '1',
+                });
+                setExternalUrls(Array.isArray(product.images) ? product.images : []);
                 setLoading(false);
-            }
+            } else throw new Error("Product data not found.");
         } catch (e) {
-            setError(`Failed to fetch product: ${e.message}`);
+            setError(e.message);
             setLoading(false);
         }
     }, [id]);
 
-    useEffect(() => {
-        fetchProduct();
-    }, [fetchProduct]);
-
-
-    // --- 2. LOAD FETCHED DATA INTO FORM ---
-    useEffect(() => {
-        if (product) {
-            const imagesString = Array.isArray(product.images)
-                ? product.images.join(', ')
-                : product.images || '';
-
-            setFormData({
-                id: product.id || '',
-                name: product.name || '',
-                description: product.description || '',
-                category: product.category || 'Men',
-                subCategory: product.sub_category || '',
-                price: product.price ? (product.price / 100).toFixed(2) : '',
-                on_sale: product.on_sale,
-                sale_price: product.sale_price ? (product.sale_price / 100).toFixed(2) : '',
-                stock: product.stock || 0,
-                is_featured: product.is_featured,
-                images: imagesString,
-            });
-            setLoading(false);
-        }
-    }, [product]);
-
-    // --- 3. IMAGE HANDLING HELPERS (omitted for brevity) ---
-    const getImageArray = useCallback(() => {
-        if (!formData.images) return [];
-        const cleanImages = formData.images
-            .replace(/(\r\n|\n|\r)/gm, "")
-            .split(',')
-            .map(s => s.trim())
-            .filter(Boolean);
-        return cleanImages;
-    }, [formData.images]);
-
-    const updateImages = (newImageArray) => {
-        setFormData(prev => ({ ...prev, images: newImageArray.map(s => s.trim()).join(',') }));
-    };
-
-    // --- 4. UI HANDLERS (omitted for brevity) ---
-    const handleDrag = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.type === "dragenter" || e.type === "dragover") setDragActive(true);
-        else if (e.type === "dragleave") setDragActive(false);
-    };
-
-    const processFile = (file) => {
-        if (!file.type.startsWith('image/')) {
-            setNotification({ message: "Please upload a valid image file (PNG, JPEG, GIF).", type: 'warning' });
-            return;
-        }
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const dataUrl = e.target.result.trim();
-            updateImages([...getImageArray(), dataUrl]);
-            setNotification({ message: "Image added for preview (Base64). Only external URLs will be saved.", type: 'warning' });
-        };
-        reader.readAsDataURL(file);
-    };
-
-    const handleDrop = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setDragActive(false);
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]);
-    };
+    useEffect(() => { fetchProduct(); }, [fetchProduct]);
 
     const handleFileSelect = (e) => {
-        if (e.target.files && e.target.files[0]) processFile(e.target.files[0]);
+        if (e.target.files) {
+            const files = Array.from(e.target.files);
+            files.forEach(file => {
+                setSelectedFiles(prev => [...prev, file]);
+                const reader = new FileReader();
+                reader.onload = (ev) => setPreviews(prev => [...prev, ev.target.result]);
+                reader.readAsDataURL(file);
+            });
+        }
     };
 
-    const handleRemoveImage = (indexToRemove) => {
-        const newImages = getImageArray().filter((_, index) => index !== indexToRemove);
-        updateImages(newImages);
-    };
-
-    const handleUrlAdd = (e) => {
-        e.preventDefault();
-        if (newImageUrl.trim()) {
-            updateImages([...getImageArray(), newImageUrl.trim()]);
-            setNewImageUrl('');
+    const removeImage = (index, type) => {
+        if (type === 'file') {
+            setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+            setPreviews(prev => prev.filter((_, i) => i !== index));
+        } else {
+            setExternalUrls(prev => prev.filter((_, i) => i !== index));
         }
     };
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: type === 'checkbox' ? checked : value
-        }));
+        setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
     };
 
-    // --- 5. CORE SAVE FUNCTION ---
-    const executeSave = async (payload) => {
+    const executeSave = async () => {
+        const actualPrice = parseFloat(formData.price || 0);
+        const discountPrice = parseFloat(formData.sale_price || 0);
+
+        if (formData.on_sale && discountPrice >= actualPrice) {
+            setModalConfig({
+                open: true,
+                title: "Pricing Protocol Error",
+                message: "Remoulding failed: Offer Discount must be lower than the Actual Price.",
+                type: "error"
+            });
+            return;
+        }
+
         setSaving(true);
-        setIsWarningModalOpen(false);
+        setModalConfig({ ...modalConfig, open: false });
+        const uploadData = new FormData();
+
+        uploadData.append('id', id);
+        uploadData.append('name', formData.name);
+        uploadData.append('category', formData.category);
+        uploadData.append('sub_category', formData.subCategory);
+        uploadData.append('description', formData.description);
+        uploadData.append('price', formData.price);
+        uploadData.append('stock', formData.stock);
+        uploadData.append('on_sale', formData.on_sale ? 1 : 0);
+        uploadData.append('sale_price', formData.on_sale ? formData.sale_price : 0);
+        uploadData.append('featured', formData.is_featured ? 1 : 0);
+        uploadData.append('external_images', externalUrls.join(','));
+        selectedFiles.forEach((file, i) => uploadData.append(`image_file_${i}`, file));
+        uploadData.append('file_count', selectedFiles.length);
+
         try {
-            const response = await fetch(`${API_BASE_URL}/products.php`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            const text = await response.text();
-            let data;
-            try {
-                data = JSON.parse(text);
-            } catch (err) {
-                console.error("Server response was not JSON:", text);
-                throw new Error(`Server returned status ${response.status}. Raw response: ${text.substring(0, 50)}...`);
-            }
-
-            if (response.ok) {
-                if (data.error) {
-                    setNotification({ message: `Error: ${data.error}`, type: 'error' });
-                } else {
-                    setNotification({ message: "Product updated successfully!", type: 'success' });
-                    setFormData(prev => ({ ...prev, images: payload.images }));
-                    navigate('/admin');
-                }
-            } else {
-                setNotification({ message: `Failed to update: ${data.error || 'Server error'}`, type: 'error' });
-            }
+            const response = await fetch(`${API_BASE_URL}/products.php`, { method: 'POST', body: uploadData });
+            const data = await response.json();
+            if (data.success) {
+                setNotification({ message: "PRODUCT REMOULDED SUCCESSFULLY", type: 'success' });
+                navigate('/admin');
+            } else throw new Error(data.error);
         } catch (err) {
-            console.error(err);
-            setNotification({ message: `Network/CORS Error: ${err.message}`, type: 'error' });
-        } finally {
-            setSaving(false);
-            setPendingPayload(null);
-        }
+            setNotification({ message: err.message || "SYNC ERROR", type: 'error' });
+        } finally { setSaving(false); }
     };
 
-    // --- 6. FORM SUBMISSION (Initial Check) ---
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setSaving(true);
+    const inputStyle = "w-full bg-white/5 border border-white/10 rounded-xl h-12 px-4 outline-none focus:border-primary transition-all font-mono text-xs text-current placeholder:opacity-40";
 
-        const currentImages = getImageArray();
-        const cleanImageUrls = currentImages.filter(url => isValidHttpUrl(url)).join(',');
-
-        const { images: _, ...formDataWithoutImages } = formData;
-
-        // Ensure boolean values are explicitly cast to 1 or 0 for the PHP backend
-        const payload = {
-            ...formDataWithoutImages,
-            id: parseInt(id, 10),
-            price: Math.round(parseFloat(formData.price) * 100),
-            sale_price: formData.on_sale && formData.sale_price ? Math.round(parseFloat(formData.sale_price) * 100) : 0,
-            on_sale: formData.on_sale ? 1 : 0,
-            is_featured: formData.is_featured ? 1 : 0,
-            sub_category: formData.subCategory || '',
-            images: cleanImageUrls,
-        };
-
-        if (currentImages.some(url => url.startsWith('data:'))) {
-            setNotification({
-                message: "Warning: Base64 images were removed before saving. Only external URLs are saved by the API.",
-                type: 'warning'
-            });
-        }
-
-        // CHECK: If no image is present, show modal
-        if (!cleanImageUrls) {
-            setPendingPayload(payload);
-            setIsWarningModalOpen(true);
-        } else {
-            // If image is present, save immediately
-            executeSave(payload);
-        }
-    };
-
-    // Handler for modal confirmation
-    const handleModalConfirm = () => {
-        if (pendingPayload) {
-            executeSave(pendingPayload);
-        }
-    };
-
-    // --- 7. RENDER ---
     if (loading) return (
-        <div className="min-h-screen bg-[#080808] flex items-center justify-center text-[#CCFF00]">
-            <Loader className="animate-spin mr-2" /> Loading Product...
-        </div>
-    );
-
-    if (error) return (
-        <div className="min-h-screen bg-[#080808] flex flex-col items-center justify-center text-red-500">
-            <p className="text-xl mb-4">{error}</p>
-            <button onClick={() => navigate('/admin')} className="text-[#CCFF00] hover:underline">Return to Dashboard</button>
+        <div className="min-h-screen bg-background flex flex-col items-center justify-center text-primary font-mono">
+            <Loader className="animate-spin mb-4" size={32} />
+            <span className="text-[10px] uppercase tracking-[0.4em]">Decoding_Data...</span>
         </div>
     );
 
     return (
-        <div className="min-h-screen bg-[#080808] text-white p-6 md:p-12 font-sans pt-24">
-            <div className="max-w-4xl mx-auto">
-                <button
-                    onClick={() => navigate('/admin')}
-                    className="flex items-center gap-2 text-[#888] hover:text-[#CCFF00] mb-6 transition-colors font-mono text-sm uppercase"
-                >
-                    <ArrowLeft size={20} /> Back to Dashboard
-                </button>
-
-                <div className="bg-[#111] border border-[#1a1a1a] rounded-lg shadow-2xl overflow-hidden">
-                    <div className="p-6 border-b border-[#333] bg-[#0f0f0f] flex justify-between items-center">
-                        <h1 className="font-display text-3xl text-white uppercase flex items-center gap-2">
-                            <Save size={28} className="text-[#CCFF00]" /> Edit Product <span className="text-gray-500 text-base font-mono">#{id}</span>
-                        </h1>
+        <div className="min-h-screen bg-background text-current transition-colors duration-500 pb-20 pt-28">
+            <div className="fixed top-[64px] left-0 w-full z-40 bg-card/90 backdrop-blur-md border-b border-current/10 px-6 py-4">
+                <div className="max-w-6xl mx-auto flex items-center justify-between font-mono text-xs uppercase tracking-widest">
+                    <div className="flex items-center gap-4">
+                        <span className="opacity-40">Admin</span>
+                        <ChevronRight size={12} className="opacity-20" />
+                        <span className="text-primary font-black italic">Remould_#{id}</span>
                     </div>
-
-                    <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-6">
-                        {/* --- BASIC INFO --- */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div>
-                                <label className="block text-[#CCFF00] text-sm font-mono mb-2 uppercase tracking-wider">Product Name</label>
-                                <input
-                                    type="text"
-                                    name="name"
-                                    value={formData.name}
-                                    onChange={handleChange}
-                                    required
-                                    className="w-full bg-black border border-[#333] text-white p-3 rounded-lg focus:border-[#CCFF00] focus:ring-1 focus:ring-[#CCFF00] focus:outline-none transition-colors font-mono"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[#CCFF00] text-sm font-mono mb-2 uppercase tracking-wider">Main Category</label>
-                                <input
-                                    type="text"
-                                    name="category"
-                                    value={formData.category}
-                                    onChange={handleChange}
-                                    required
-                                    placeholder="e.g., Men, Women, Outerwear"
-                                    className="w-full bg-black border border-[#333] text-white p-3 rounded-lg focus:border-[#CCFF00] focus:ring-1 focus:ring-[#CCFF00] focus:outline-none transition-colors font-mono"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[#CCFF00] text-sm font-mono mb-2 uppercase tracking-wider">Sub-Category</label>
-                                <input
-                                    type="text"
-                                    name="subCategory"
-                                    value={formData.subCategory}
-                                    onChange={handleChange}
-                                    placeholder="e.g., T-shirts, Hoodies, Rings"
-                                    className="w-full bg-black border border-[#333] text-white p-3 rounded-lg focus:border-[#CCFF00] focus:ring-1 focus:ring-[#CCFF00] focus:outline-none transition-colors font-mono"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label className="block text-[#CCFF00] text-sm font-mono mb-2 uppercase tracking-wider">Price (₦)</label>
-                                <input
-                                    type="number"
-                                    name="price"
-                                    step="0.01"
-                                    value={formData.price}
-                                    onChange={handleChange}
-                                    required
-                                    className="w-full bg-black border border-[#333] text-white p-3 rounded-lg focus:border-[#CCFF00] focus:ring-1 focus:ring-[#CCFF00] focus:outline-none transition-colors font-mono"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[#CCFF00] text-sm font-mono mb-2 uppercase tracking-wider">Stock Quantity</label>
-                                <input
-                                    type="number"
-                                    name="stock"
-                                    value={formData.stock}
-                                    onChange={handleChange}
-                                    required
-                                    className="w-full bg-black border border-[#333] text-white p-3 rounded-lg focus:border-[#CCFF00] focus:ring-1 focus:ring-[#CCFF00] focus:outline-none transition-colors font-mono"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Sale and Featured Checkboxes */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end border-b border-[#222] pb-6">
-                            <div className='flex items-center gap-3'>
-                                <input
-                                    id="on_sale_checkbox"
-                                    type="checkbox"
-                                    name="on_sale"
-                                    checked={formData.on_sale}
-                                    onChange={handleChange}
-                                    className="h-4 w-4 text-[#CCFF00] bg-gray-700 border-gray-600 rounded focus:ring-[#CCFF00] accent-[#CCFF00]"
-                                />
-                                <label htmlFor="on_sale_checkbox" className="text-white text-sm font-mono uppercase">Product On Sale?</label>
-                            </div>
-                            <div className='flex items-center gap-3'>
-                                <input
-                                    id="is_featured_checkbox"
-                                    type="checkbox"
-                                    name="is_featured"
-                                    checked={formData.is_featured}
-                                    onChange={handleChange}
-                                    className="h-4 w-4 text-[#CCFF00] bg-gray-700 border-gray-600 rounded focus:ring-[#CCFF00] accent-[#CCFF00]"
-                                />
-                                <label htmlFor="is_featured_checkbox" className="text-white text-sm font-mono uppercase flex items-center gap-2">
-                                    <Star size={16} className="text-[#CCFF00]" /> Feature on Homepage?
-                                </label>
-                            </div>
-
-                            <div className='md:col-span-1'>
-                                <label className="block text-[#CCFF00] text-sm font-mono mb-2 uppercase tracking-wider">Sale Price (₦)</label>
-                                <input
-                                    type="number"
-                                    name="sale_price"
-                                    step="0.01"
-                                    value={formData.sale_price}
-                                    onChange={handleChange}
-                                    disabled={!formData.on_sale}
-                                    className={`w-full bg-black border border-[#333] text-white p-3 rounded-lg focus:border-red-500 focus:ring-1 focus:ring-red-500 focus:outline-none transition-colors font-mono ${!formData.on_sale ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-[#CCFF00] text-sm font-mono mb-2 uppercase tracking-wider">Description</label>
-                            <textarea
-                                rows="4"
-                                name="description"
-                                value={formData.description}
-                                onChange={handleChange}
-                                required
-                                className="w-full bg-black border border-[#333] text-white p-3 rounded-lg focus:border-[#CCFF00] focus:ring-1 focus:ring-[#CCFF00] focus:outline-none transition-colors resize-none font-mono"
-                            />
-                        </div>
-
-                        {/* --- IMAGE MANAGER --- */}
-                        <div className="border-t border-[#222] pt-6 mt-2">
-                            <label className="block text-[#CCFF00] text-sm font-mono mb-4 uppercase tracking-wider">Product Images</label>
-
-                            <div className="grid grid-cols-3 md:grid-cols-5 gap-4 mb-4">
-                                {/* Existing Images List */}
-                                {getImageArray().map((url, idx) => (
-                                    <div key={idx} className="relative group aspect-square bg-[#080808] border border-[#333] rounded overflow-hidden">
-                                        {url.startsWith('data:') || !isValidHttpUrl(url) ? (
-                                            <div className="w-full h-full flex items-center justify-center text-[#888]">
-                                                <ImageIcon size={32} />
-                                            </div>
-                                        ) : (
-                                            <img
-                                                src={url}
-                                                alt={`Product ${idx}`}
-                                                className="w-full h-full object-cover"
-                                                onError={(e) => { e.target.style.display = 'none'; }}
-                                            />
-                                        )}
-
-                                        <button
-                                            type="button"
-                                            onClick={() => handleRemoveImage(idx)}
-                                            className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-red-500"
-                                        >
-                                            <Trash2 size={24} />
-                                        </button>
-                                    </div>
-                                ))}
-
-                                {/* Drop Zone */}
-                                <div
-                                    className={`relative aspect-square border-2 border-dashed rounded flex flex-col items-center justify-center cursor-pointer transition-colors
-                                ${dragActive ? 'border-[#CCFF00] bg-[#CCFF00]/10' : 'border-[#333] hover:border-gray-500 bg-[#0a0a0a]'}`}
-                                    onDragEnter={handleDrag}
-                                    onDragLeave={handleDrag}
-                                    onDragOver={handleDrag}
-                                    onDrop={handleDrop}
-                                    onClick={() => document.getElementById('file-upload').click()}
-                                >
-                                    <Upload size={24} className={dragActive ? 'text-[#CCFF00]' : 'text-[#888]'} />
-                                    <span className="text-[10px] text-[#888] mt-2 font-mono uppercase">Click or Drop</span>
-                                    <input
-                                        id="file-upload"
-                                        type="file"
-                                        accept="image/*"
-                                        className="hidden"
-                                        onChange={handleFileSelect}
-                                    />
-                                </div>
-                            </div>
-
-                            <p className="text-xs text-red-400 font-mono mb-2">Note: Drag & Drop uploads files as temporary Base64 for preview. Only fully qualified HTTP/HTTPS URLs are saved to the database.</p>
-
-                            {/* Add URL Fallback */}
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    placeholder="Or paste image URL..."
-                                    value={newImageUrl}
-                                    onChange={e => setNewImageUrl(e.target.value)}
-                                    className="flex-1 bg-black border border-[#333] px-3 py-2 text-sm text-white rounded-lg focus:border-[#CCFF00] focus:ring-1 focus:ring-[#CCFF00] outline-none font-mono"
-                                    onKeyDown={e => e.key === 'Enter' && handleUrlAdd(e)}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={handleUrlAdd}
-                                    className="bg-[#222] hover:bg-[#333] text-white px-4 py-2 rounded-lg text-xs font-mono uppercase"
-                                >
-                                    Add URL
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* --- ACTION BUTTONS --- */}
-                        <div className="pt-6 border-t border-[#333] flex justify-end gap-4">
-                            <button
-                                type="button"
-                                onClick={() => navigate('/admin')}
-                                className="px-6 py-3 text-[#888] hover:text-white font-mono uppercase text-sm transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={saving}
-                                className={`flex items-center gap-2 bg-[#CCFF00] text-black px-8 py-3 rounded-lg font-bold hover:bg-[#b3ff00] transition-colors uppercase tracking-wide font-mono ${saving || isWarningModalOpen ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                                {saving ? (
-                                    <><Loader className="animate-spin" size={18} /> Saving...</>
-                                ) : (
-                                    <><Save size={18} /> Save Changes</>
-                                )}
-                            </button>
-                        </div>
-                    </form>
+                    <button onClick={() => navigate('/admin')} className="flex items-center gap-2 px-4 py-2 bg-primary text-black rounded-lg font-black text-[10px] tracking-widest shadow-xl transition-all active:scale-95">
+                        <ArrowLeft size={14} /> Dashboard
+                    </button>
                 </div>
             </div>
 
-            <WarningModal
-                isOpen={isWarningModalOpen}
-                onClose={() => {
-                    setIsWarningModalOpen(false);
-                    setNotification({ message: "Saving cancelled.", type: 'default' });
-                }}
-                onConfirm={handleModalConfirm}
-            />
+            <div className="max-w-6xl mx-auto px-6 font-mono mt-16">
+                <form onSubmit={(e) => { e.preventDefault(); (!selectedFiles.length && !externalUrls.length) ? setModalConfig({ open: true, title: "Media Missing", message: "No visual representation detected. Proceed?", type: "warning" }) : executeSave(); }} className="grid grid-cols-1 lg:grid-cols-3 gap-8 text-current">
+                    <div className="lg:col-span-2 space-y-6">
+                        <div className="bg-card border border-white/10 p-8 rounded-2xl shadow-xl">
+                            <h3 className="text-sm font-black uppercase tracking-[0.2em] mb-8 text-primary flex items-center gap-2"><Info size={16} /> Identity_Protocol</h3>
+                            <div className="space-y-6">
+                                <div>
+                                    <p className="text-[9px] font-black uppercase opacity-40 mb-2 ml-1 tracking-widest text-current">Product Name</p>
+                                    <input type="text" name="name" value={formData.name} onChange={handleChange} required className={inputStyle} />
+                                </div>
+                                <div>
+                                    <p className="text-[9px] font-black uppercase opacity-40 mb-2 ml-1 tracking-widest text-current">Specifications</p>
+                                    <textarea rows="5" name="description" value={formData.description} onChange={handleChange} required className={`${inputStyle} h-auto py-4 resize-none`} />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-card border border-white/10 p-8 rounded-2xl shadow-xl">
+                            <h3 className="text-sm font-black uppercase tracking-[0.2em] mb-8 text-primary flex items-center gap-2"><ImageIcon size={16} /> Visual_Buffer</h3>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                                {externalUrls.map((url, i) => (
+                                    <div key={`ext-${i}`} className="relative aspect-square bg-white/5 rounded-xl overflow-hidden border border-white/10 group">
+                                        <img src={url} className="w-full h-full object-cover" />
+                                        <button type="button" onClick={() => removeImage(i, 'url')} className="absolute inset-0 bg-red-600/90 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white"><Trash2 size={24} /></button>
+                                    </div>
+                                ))}
+                                {previews.map((src, i) => (
+                                    <div key={`new-${i}`} className="relative aspect-square bg-white/5 rounded-xl overflow-hidden border border-primary/30 group">
+                                        <img src={src} className="w-full h-full object-cover" />
+                                        <button type="button" onClick={() => removeImage(i, 'file')} className="absolute inset-0 bg-red-600/90 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white"><Trash2 size={24} /></button>
+                                    </div>
+                                ))}
+                                <div onClick={() => document.getElementById('file-upload').click()} className="aspect-square border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-white/5 text-current/20 hover:text-primary transition-all">
+                                    <Plus size={32} />
+                                    <input id="file-upload" type="file" multiple accept="image/*" className="hidden" onChange={handleFileSelect} />
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <input type="text" placeholder="EXTERNAL_URL" value={newImageUrl} onChange={e => setNewImageUrl(e.target.value)} className={inputStyle} />
+                                <button type="button" onClick={(e) => { e.preventDefault(); if (newImageUrl) { setExternalUrls(p => [...p, newImageUrl]); setNewImageUrl(''); } }} className="bg-white/5 border border-white/10 px-6 rounded-xl text-[10px] font-black uppercase hover:bg-primary hover:text-black transition-all">Link</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-6">
+                        <div className="bg-card border border-white/10 p-8 rounded-2xl shadow-xl">
+                            <h3 className="text-sm font-black uppercase tracking-[0.2em] mb-8 text-primary flex items-center gap-2"><DollarSign size={16} /> Pricing_Module</h3>
+                            <div className="space-y-6">
+                                <div>
+                                    <p className="text-[9px] font-black uppercase opacity-40 mb-2 ml-1 tracking-widest text-current">Actual Price (₦)</p>
+                                    <input type="number" name="price" value={formData.price} onChange={handleChange} required className={`${inputStyle} text-lg font-black`} />
+                                </div>
+                                <div className="p-5 bg-white/5 rounded-xl border border-white/10">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <span className="text-[9px] font-black uppercase opacity-60">Offer Discount</span>
+                                        <button type="button" onClick={() => setFormData(p => ({ ...p, on_sale: !p.on_sale }))} className={`w-12 h-6 rounded-full relative transition-all duration-300 ${formData.on_sale ? 'bg-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.5)]' : 'bg-white/10'}`}>
+                                            <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${formData.on_sale ? 'left-7' : 'left-1'}`} />
+                                        </button>
+                                    </div>
+                                    <input type="number" name="sale_price" value={formData.sale_price} onChange={handleChange} disabled={!formData.on_sale} className={`${inputStyle} h-10 disabled:opacity-20`} placeholder="DISCOUNTED_PRICE" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-card border border-white/10 p-8 rounded-2xl shadow-xl">
+                            <h3 className="text-sm font-black uppercase tracking-[0.2em] mb-8 text-primary flex items-center gap-2"><Tag size={16} /> Logistics_Data</h3>
+                            <div className="space-y-6">
+                                <div>
+                                    <p className="text-[9px] font-black uppercase opacity-40 mb-2 ml-1 tracking-widest text-current">Inventory Level</p>
+                                    <input type="number" name="stock" value={formData.stock} onChange={handleChange} required className={inputStyle} />
+                                </div>
+                                <div>
+                                    <p className="text-[9px] font-black uppercase opacity-40 mb-2 ml-1 tracking-widest text-current">Category</p>
+                                    <input type="text" name="category" value={formData.category} onChange={handleChange} className={inputStyle} />
+                                </div>
+                                <div>
+                                    <p className="text-[9px] font-black uppercase opacity-40 mb-2 ml-1 tracking-widest text-current">Sub-Category</p>
+                                    <input type="text" name="subCategory" value={formData.subCategory} onChange={handleChange} className={inputStyle} />
+                                </div>
+                                <label className="flex items-center gap-3 p-3 bg-white/5 rounded-xl cursor-pointer group">
+                                    <div className={`w-4 h-4 rounded border border-primary flex items-center justify-center transition-all ${formData.is_featured ? 'bg-primary' : ''}`}>
+                                        {formData.is_featured && <X size={10} className="text-black" />}
+                                    </div>
+                                    <input type="checkbox" name="is_featured" checked={formData.is_featured} onChange={handleChange} className="hidden" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Featured Product</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <button type="submit" disabled={saving} className="w-full bg-primary text-black py-5 rounded-2xl font-black uppercase tracking-[0.4em] text-xs shadow-2xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-3 group">
+                            {saving ? <Loader className="animate-spin" size={16} /> : <Save size={16} className="group-hover:rotate-12 transition-transform" />} Remould Product
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <WarningModal isOpen={modalConfig.open} onClose={() => setModalConfig({ ...modalConfig, open: false })} onConfirm={executeSave} title={modalConfig.title} message={modalConfig.message} type={modalConfig.type} />
         </div>
     );
 };

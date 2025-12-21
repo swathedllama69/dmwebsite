@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, useNavigate, useParams, useLocation, Navigate, Link } from 'react-router-dom';
 import {
   LogIn, Menu, X, ShoppingCart as ShoppingCartIcon,
-  Package, User, LogOut, LayoutDashboard, Loader2, UserCircle, ChevronRight, ShieldCheck
+  Package, User, LogOut, LayoutDashboard, Loader2, UserCircle, ChevronRight, ShieldCheck,
+  ChevronDown, Globe
 } from 'lucide-react';
 
 // Import components and utilities
@@ -17,6 +18,7 @@ import { CheckoutProcess } from './components/CheckoutProcess.jsx';
 import { ProductDetail } from './components/ProductDetail.jsx';
 import AdminOrderDetail from './components/AdminOrderDetail.jsx';
 import { CustomerOrderDetail } from './components/CustomerOrderDetail.jsx';
+import { AdminLogin } from './components/AdminLogin.jsx';
 
 import { GlobalStyles, NotificationToast } from './components/UI.jsx';
 import { Footer } from './components/Footer.jsx';
@@ -101,9 +103,12 @@ export default function App() {
   const [headerStyle, setHeaderStyle] = useState('dark');
   const [showLoginModal, setShowLoginModal] = useState(false);
 
+  // Initialize settings with defaults (prevent divide by zero)
   const [settings, setSettings] = useState({
     active_theme: 'devolt-punk',
-    active_font_style: 'style-a'
+    active_font_style: 'style-a',
+    rateUSD: '1600',
+    rateGBP: '1850'
   });
 
   // --- 3. PERSISTENCE ---
@@ -150,7 +155,7 @@ export default function App() {
     setIsAdminLoggedIn(false);
     setIsCustomerLoggedIn(false);
     setCustomerData(null);
-    localStorage.clear(); // Clear all for safety
+    localStorage.clear();
     setNotification({ message: "SECURELY_LOGGED_OUT", type: 'default' });
     navigate('/');
     setIsMobileMenuOpen(false);
@@ -174,25 +179,29 @@ export default function App() {
     setCart(prevCart => prevCart.filter(item => item.product.id !== id));
   };
 
+  // Helper to check if dashboard link is active (Admin or Customer)
+  const dashboardPath = isAdminLoggedIn ? "/admin" : "/account";
+  // Strict check: Is the exact path OR does it start with path/ (to handle sub-routes like /admin/orders)
+  const isDashboardActive = location.pathname === dashboardPath || location.pathname.startsWith(`${dashboardPath}/`);
+
   return (
     <div className="min-h-screen font-body overflow-x-hidden transition-colors duration-500 bg-background text-current">
       <GlobalStyles />
       <ScrollToTop />
 
       {/* HEADER */}
-      {/* --- HEADER --- */}
       <nav className={`fixed w-full z-50 top-0 left-0 px-4 md:px-8 flex justify-center items-center transition-all duration-300 pt-2 
-  ${(isScrolled || headerStyle === 'light') ? 'bg-header pb-2 shadow-xl' : 'bg-transparent pb-4'}`}>
+        ${(isScrolled || headerStyle === 'light') ? 'bg-header pb-2 shadow-xl' : 'bg-transparent pb-4'}`}>
 
         <div className="w-full max-w-7xl flex justify-between items-center h-16 relative">
 
-          {/* LOGO & BRANDING: Side-by-Side, No Floating */}
+          {/* LOGO & BRANDING */}
           <div className="flex items-center flex-shrink-0">
             <Link to="/" className="group flex items-center gap-3">
               <img
                 src={headerStyle === 'light' ? `${RESOURCE_URL}/devolt_logo.png` : `${RESOURCE_URL}/devolt_logo2.png`}
                 alt="Devolt Logo"
-                className="h-12 md:h-14 w-auto drop-shadow-[0_0_10px_var(--accent-color)] object-contain transition-transform group-hover:scale-105"
+                className="h-16 md:h-20 w-auto object-contain transition-transform group-hover:scale-105"
               />
               <span
                 className="text-xl md:text-2xl tracking-tighter uppercase nav-text-dynamic font-black leading-none"
@@ -203,26 +212,28 @@ export default function App() {
             </Link>
           </div>
 
-          {/* CENTER LINKS: Icons, Names, and Separators */}
+          {/* CENTER LINKS */}
           <div className="hidden md:flex items-center font-heading text-[14px] uppercase tracking-[0.2em] font-black">
 
             <Link to="/" className={`flex items-center gap-2 px-4 transition-all hover:text-primary ${location.pathname === '/' ? 'text-primary' : 'nav-text-dynamic'}`}>
               <Package size={22} /> Home
             </Link>
 
-            <div className="h-4 w-[1px] bg-white/10" /> {/* Separator */}
+            <div className="h-4 w-[1px] bg-white/10" />
 
             <Link to="/collections" className={`flex items-center gap-2 px-4 transition-all hover:text-primary ${location.pathname === '/collections' ? 'text-primary' : 'nav-text-dynamic'}`}>
               <LayoutDashboard size={14} /> Collections
             </Link>
 
-            {/* DYNAMIC DASHBOARD: Only visible when logged in */}
+            {/* DYNAMIC DASHBOARD LINK (Fixed Active State) */}
             {(isAdminLoggedIn || isCustomerLoggedIn) && (
               <>
-                <div className="h-4 w-[1px] bg-white/10" /> {/* Separator */}
+                <div className="h-4 w-[1px] bg-white/10" />
                 <Link
-                  to={isAdminLoggedIn ? "/admin" : "/account"}
-                  className="flex items-center gap-2 px-5 py-2 mx-2 transition-all bg-primary/10 border border-primary/30 rounded-full text-primary hover:bg-primary/20"
+                  to={dashboardPath}
+                  className={`flex items-center gap-2 px-5 py-2 mx-2 transition-all rounded-full border ${isDashboardActive
+                    ? 'bg-primary/10 border-primary/30 text-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.3)]'
+                    : 'bg-transparent border-transparent nav-text-dynamic hover:bg-white/5'}`}
                 >
                   <ShieldCheck size={14} /> Dashboard
                 </Link>
@@ -232,6 +243,25 @@ export default function App() {
 
           {/* ACTIONS AREA */}
           <div className="flex items-center gap-3 md:gap-5">
+
+            {/* CURRENCY CONVERTER */}
+            <div className="hidden md:flex relative group">
+              <button className="flex items-center gap-2 px-3 py-1 rounded-lg hover:bg-white/5 nav-text-dynamic transition-all text-[10px] font-black">
+                <Globe size={14} /> {currentCurrency} <ChevronDown size={10} />
+              </button>
+              <div className="absolute top-full right-0 mt-2 w-24 bg-card border border-white/10 rounded-xl overflow-hidden shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                {['NGN', 'USD', 'GBP'].map(curr => (
+                  <button
+                    key={curr}
+                    onClick={() => setCurrentCurrency(curr)}
+                    className={`w-full text-left px-4 py-3 text-[10px] font-black hover:bg-white/5 transition-colors ${currentCurrency === curr ? 'text-primary' : 'text-current'}`}
+                  >
+                    {curr}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="hidden md:flex items-center">
               {(!isAdminLoggedIn && !isCustomerLoggedIn) ? (
                 <button onClick={() => navigate('/login')} className="flex flex-col items-center group nav-text-dynamic px-4">
@@ -248,7 +278,7 @@ export default function App() {
 
             <button
               className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all border-2 active:scale-95 
-          ${location.pathname === '/cart' ? 'bg-primary border-primary text-black' : 'bg-card border-white/5 nav-text-dynamic hover:border-primary'}`}
+              ${location.pathname === '/cart' ? 'bg-primary border-primary text-black' : 'bg-card border-white/5 nav-text-dynamic hover:border-primary'}`}
               onClick={() => navigate('/cart')}
             >
               <ShoppingCartIcon size={18} className={location.pathname === '/cart' ? 'text-black' : 'text-primary'} />
@@ -268,6 +298,19 @@ export default function App() {
         <div className="flex flex-col items-center space-y-8 font-heading text-2xl uppercase font-black w-full text-center text-white italic tracking-tighter">
           <Link to="/" onClick={() => setIsMobileMenuOpen(false)}>Warehouse</Link>
           <Link to="/collections" onClick={() => setIsMobileMenuOpen(false)}>Collections</Link>
+
+          {/* Mobile Currency Switcher */}
+          <div className="flex gap-4 items-center justify-center py-4">
+            {['NGN', 'USD', 'GBP'].map(curr => (
+              <button
+                key={curr}
+                onClick={() => setCurrentCurrency(curr)}
+                className={`text-sm px-4 py-2 rounded-full border ${currentCurrency === curr ? 'bg-primary text-black border-primary' : 'border-white/20 text-white'}`}
+              >
+                {curr}
+              </button>
+            ))}
+          </div>
 
           {(isAdminLoggedIn || isCustomerLoggedIn) && (
             <Link
@@ -316,28 +359,118 @@ export default function App() {
       {/* ROUTING ENGINE */}
       <main>
         <Routes>
+          {/* PUBLIC ROUTES */}
           <Route path="/" element={<ShopView products={products} loading={loading} error={error} fetchProducts={fetchProducts} currentCurrency={currentCurrency} addToCart={addToCart} setNotification={setNotification} setProductId={(id) => navigate(`/product/${id}`)} settings={settings} />} />
-          <Route path="/collections" element={<CollectionsView products={products} loading={loading} error={error} currentCurrency={currentCurrency} addToCart={addToCart} setNotification={setNotification} setProductId={(id) => navigate(`/product/${id}`)} />} />
+          <Route path="/collections" element={<CollectionsView products={products} loading={loading} error={error} currentCurrency={currentCurrency} addToCart={addToCart} setNotification={setNotification} setProductId={(id) => navigate(`/product/${id}`)} settings={settings} />} />
           <Route path="/product/:id" element={<ProductLookup products={products} user={customerData} currentCurrency={currentCurrency} addToCart={addToCart} setNotification={setNotification} settings={settings} setShowLoginModal={setShowLoginModal} headerStyle={headerStyle} />} />
-          <Route path="/cart" element={<CheckoutProcess cart={cart} currentCurrency={currentCurrency} updateCartQuantity={updateCartQuantity} removeFromCart={removeFromCart} clearCart={() => setCart([])} setNotification={setNotification} userId={customerData?.user_id || null} customerEmail={customerData?.email || null} customerName={customerData?.name || null} navigateToShop={() => navigate('/')} />} />
-          <Route path="/reset-password" element={<ResetPassword setNotification={setNotification} />} />
+
+          {/* CHECKOUT ROUTE WITH DATA PASSING */}
+          <Route
+            path="/cart"
+            element={
+              <CheckoutProcess
+                cart={cart}
+                currentCurrency={currentCurrency}
+                updateCartQuantity={updateCartQuantity}
+                removeFromCart={removeFromCart}
+                clearCart={() => setCart([])}
+                setNotification={setNotification}
+                userId={customerData?.id || customerData?.user_id || null}
+                customerEmail={customerData?.email || null}
+                customerName={customerData?.name || null}
+                // --- PASS NEW FIELDS HERE ---
+                userFirstName={customerData?.first_name || ''}
+                userLastName={customerData?.last_name || ''}
+                userPhone={customerData?.phone || ''} // Ensure your auth.php returns 'phone' key for 'Phone Number' DB column
+                // ---------------------------
+                settings={settings}
+                navigateToShop={() => navigate('/')}
+              />
+            }
+          />
+
+          {/* CUSTOMER ACCOUNT ROUTES */}
           <Route path="/login" element={isCustomerLoggedIn ? <Navigate to="/account" /> : <LoginView setIsCustomerLoggedIn={setIsCustomerLoggedIn} setCustomerData={setCustomerData} setNotification={setNotification} navigateToAccount={() => navigate('/account')} />} />
-          <Route path="/account" element={isCustomerLoggedIn ? <CustomerAccount customer={customerData} handleCustomerLogOut={handleLogOut} currentCurrency={currentCurrency} setNotification={setNotification} /> : <Navigate to="/login" />} />
-          <Route path="/account/orders/:id" element={<CustomerOrderDetail setNotification={setNotification} currentCurrency={currentCurrency} />} />
+          <Route path="/reset-password" element={<ResetPassword setNotification={setNotification} />} />
+          <Route path="/account" element={isCustomerLoggedIn ? <CustomerAccount customer={customerData} handleCustomerLogOut={handleLogOut} currentCurrency={currentCurrency} setNotification={setNotification} settings={settings} /> : <Navigate to="/login" />} />
+          <Route path="/account/orders/:id" element={<CustomerOrderDetail setNotification={setNotification} currentCurrency={currentCurrency} settings={settings} />} />
+
+          {/* INFO PAGES */}
           <Route path="/about" element={<AboutUs />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/shipping" element={<ShippingPolicy />} />
           <Route path="/returns" element={<ReturnsPolicy />} />
-          <Route path="/admin" element={<AdminDashboard products={products} loading={loading} error={error} fetchProducts={fetchProducts} setNotification={setNotification} isAdminLoggedIn={isAdminLoggedIn} setIsAdminLoggedIn={setIsAdminLoggedIn} settings={settings} fetchSettings={fetchSettings} currentCurrency={currentCurrency} />} />
-          <Route path="/admin/order/:id" element={<AdminOrderDetail setNotification={setNotification} currentCurrency={currentCurrency} />} />
-          <Route path="/add-product" element={<AddProduct setNotification={setNotification} />} />
-          <Route path="/edit-product/:id" element={<EditProduct setNotification={setNotification} />} />
+
+          {/* ADMIN ROUTES (Protected) */}
+          <Route
+            path="/admin"
+            element={
+              isAdminLoggedIn ? (
+                <AdminDashboard
+                  products={products}
+                  loading={loading}
+                  error={error}
+                  fetchProducts={fetchProducts}
+                  setNotification={setNotification}
+                  isAdminLoggedIn={isAdminLoggedIn}
+                  setIsAdminLoggedIn={setIsAdminLoggedIn}
+                  settings={settings}
+                  fetchSettings={fetchSettings}
+                  currentCurrency={currentCurrency} // Admin can view in different currencies too
+                />
+              ) : (
+                <AdminLogin
+                  setIsAdminLoggedIn={setIsAdminLoggedIn}
+                  setNotification={setNotification}
+                />
+              )
+            }
+          />
+
+          <Route
+            path="/admin/order/:id"
+            element={
+              isAdminLoggedIn ? (
+                <AdminOrderDetail setNotification={setNotification} currentCurrency={currentCurrency} settings={settings} />
+              ) : (
+                <Navigate to="/admin" />
+              )
+            }
+          />
+
+          <Route
+            path="/add-product"
+            element={
+              isAdminLoggedIn ? (
+                <AddProduct setNotification={setNotification} />
+              ) : (
+                <Navigate to="/admin" />
+              )
+            }
+          />
+
+          <Route
+            path="/edit-product/:id"
+            element={
+              isAdminLoggedIn ? (
+                <EditProduct setNotification={setNotification} />
+              ) : (
+                <Navigate to="/admin" />
+              )
+            }
+          />
+
+          {/* FALLBACK */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
 
       <NotificationToast notification={notification} setNotification={setNotification} />
-      <Footer handleAdminToggle={() => navigate('/admin')} isAdminLoggedIn={isAdminLoggedIn} />
+      <Footer
+        handleAdminToggle={() => navigate('/admin')}
+        isAdminLoggedIn={isAdminLoggedIn}
+        themeMode={headerStyle}
+      />
     </div>
   );
 }

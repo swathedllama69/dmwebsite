@@ -1,8 +1,44 @@
 import React, { useState } from 'react';
-import { Mail, Lock, User, ArrowRight, ShieldCheck, Eye, EyeOff, Loader2, Sparkles, ArrowLeft, KeyRound } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, ShieldCheck, Eye, EyeOff, Loader2, Sparkles, ArrowLeft, KeyRound, Zap, Phone, Hexagon } from 'lucide-react';
 import clsx from 'clsx';
 
 const API_BASE_URL = '/api';
+
+// --- VISUALS: The Digital Forge Background ---
+const TechBackground = () => (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Animated Infinite Grid */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,currentColor_1px,transparent_1px),linear-gradient(to_bottom,currentColor_1px,transparent_1px)] bg-[size:40px_40px] opacity-[0.05] animate-pan-grid"></div>
+
+        {/* Radial Fade (Vignette) to focus center */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0)_40%,var(--bg-color)_100%)] opacity-80"></div>
+
+        {/* Floating Abstract Elements */}
+        <div className="absolute top-[10%] left-[10%] text-primary opacity-10 animate-spin-slow duration-[20s]">
+            <Hexagon size={200} strokeWidth={0.5} />
+        </div>
+        <div className="absolute bottom-[10%] right-[5%] text-current opacity-5 animate-pulse duration-[5s]">
+            <div className="w-32 h-32 border border-current rounded-full"></div>
+        </div>
+    </div>
+);
+
+// --- COMPONENT: Structural Input ---
+const TechInput = ({ icon: Icon, ...props }) => (
+    <div className="relative group">
+        <div className="relative flex items-center bg-background border border-current/20 rounded-lg overflow-hidden transition-all duration-300 group-focus-within:border-primary group-focus-within:ring-1 group-focus-within:ring-primary/50 group-focus-within:translate-x-1">
+            <div className="flex items-center justify-center w-12 h-14 bg-current/5 border-r border-current/10 group-focus-within:bg-primary/10 group-focus-within:text-primary transition-colors">
+                <Icon size={18} className="opacity-70 group-focus-within:opacity-100" />
+            </div>
+            <input
+                {...props}
+                className="w-full h-14 bg-transparent px-4 outline-none text-sm font-bold tracking-wide text-current placeholder:text-current/40 placeholder:font-normal placeholder:uppercase placeholder:text-[10px] placeholder:tracking-widest"
+            />
+            {/* Corner Tech Accent */}
+            <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-current/30 group-focus-within:border-primary transition-colors"></div>
+        </div>
+    </div>
+);
 
 export const LoginView = ({
     isModal,
@@ -12,7 +48,6 @@ export const LoginView = ({
     setNotification,
     navigateToAccount
 }) => {
-    // Views: 'login', 'register', 'forgot_password', 'reset_password'
     const [view, setView] = useState('login');
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
@@ -22,8 +57,8 @@ export const LoginView = ({
     const [password, setPassword] = useState('');
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
+    const [phone, setPhone] = useState('');
 
-    // Reset Flow Data
     const [resetToken, setResetToken] = useState('');
     const [newPassword, setNewPassword] = useState('');
 
@@ -35,13 +70,12 @@ export const LoginView = ({
             let endpoint = '';
             let payload = {};
 
-            // 1. Configure Request based on View
             if (view === 'login') {
                 endpoint = 'login';
                 payload = { email, password };
             } else if (view === 'register') {
                 endpoint = 'register';
-                payload = { email, password, first_name: firstName, last_name: lastName };
+                payload = { email, password, first_name: firstName, last_name: lastName, phone };
             } else if (view === 'forgot_password') {
                 endpoint = 'request_reset';
                 payload = { email };
@@ -50,7 +84,6 @@ export const LoginView = ({
                 payload = { token: resetToken, new_password: newPassword };
             }
 
-            // 2. Send Request
             const response = await fetch(`${API_BASE_URL}/auth.php?action=${endpoint}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -59,21 +92,16 @@ export const LoginView = ({
 
             const data = await response.json();
 
-            if (!data.success) {
-                throw new Error(data.error || "Operation failed");
-            }
+            if (!data.success) throw new Error(data.error || "Operation failed");
 
-            // 3. Handle Success Scenarios
             if (view === 'forgot_password') {
-                setNotification({ message: "Reset code sent (Check Console for Dev Token)", type: 'success' });
-                // DEV HELP: Log token to console so you can copy it
+                setNotification({ message: "Reset code sent", type: 'success' });
                 if (data.dev_token) console.log("DEV TOKEN:", data.dev_token);
-                setView('reset_password'); // Move to next step
+                setView('reset_password');
             } else if (view === 'reset_password') {
                 setNotification({ message: "Password reset successful! Please login.", type: 'success' });
                 setView('login');
             } else {
-                // Login or Register Success
                 setNotification({
                     message: view === 'login' ? "Login Successful" : "Account Created",
                     type: 'success'
@@ -85,65 +113,87 @@ export const LoginView = ({
             }
 
         } catch (err) {
-            console.error("Auth Error:", err);
             setNotification({ message: err.message, type: 'error' });
         } finally {
             setLoading(false);
         }
     };
 
-    // Helper to render title based on view
     const getTitle = () => {
-        if (view === 'login') return "Welcome Back";
-        if (view === 'register') return "Create Account";
-        if (view === 'forgot_password') return "Reset Password";
-        return "New Credentials";
+        if (view === 'login') return { main: "System Login", sub: "Enter your credentials" };
+        if (view === 'register') return { main: "New Protocol", sub: "Initialize profile data" };
+        if (view === 'forgot_password') return { main: "Recovery", sub: "Reset security token" };
+        return { main: "Update Key", sub: "Establish new password" };
     };
+
+    const titles = getTitle();
 
     return (
         <div className={clsx(
-            "relative w-full overflow-hidden transition-all duration-500",
-            isModal ? "bg-card/90 backdrop-blur-2xl rounded-[2.5rem] border border-white/10 shadow-2xl p-8 md:p-12"
-                : "max-w-md mx-auto pt-32 pb-16 px-6"
+            "relative text-current flex items-center justify-center transition-all duration-500",
+            // Center Logic: min-h-screen ensures it takes full height, flex/items-center/justify-center puts it in the middle
+            isModal
+                ? "bg-background border-2 border-current/10 shadow-2xl p-8 md:p-12 max-w-2xl w-full mx-auto rounded-3xl"
+                : "min-h-screen w-full bg-background"
         )}>
-            {/* Background Glow */}
-            <div className="absolute -top-24 -left-24 w-48 h-48 bg-primary/20 blur-[100px] rounded-full" />
+            {/* The Background Grid */}
+            <TechBackground />
 
-            <div className="relative z-10">
-                {/* Header */}
-                <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-black border border-white/10 mb-6 shadow-xl">
+            {/* CARD CONTAINER (Content Layer) */}
+            <div className={clsx(
+                "relative z-10 flex flex-col w-full",
+                // Added transform translate to ensure perfect optical centering if needed, but flex usually handles it
+                !isModal && "max-w-md bg-background/80 backdrop-blur-md p-10 border border-current/10 rounded-2xl shadow-[0_0_50px_-20px_rgba(0,0,0,0.3)]"
+            )}>
+
+                {/* --- HEADER SECTION --- */}
+                <div className="mb-10 border-b border-current/10 pb-8 text-center">
+
+                    {/* 1. CENTERED ICON BOX */}
+                    <div className="mx-auto h-20 w-20 flex items-center justify-center border border-current/10 bg-current/5 rounded-2xl text-primary shadow-[0_0_30px_-10px_var(--accent-color)] mb-6">
                         {view.includes('reset') || view === 'forgot_password' ? (
-                            <KeyRound size={32} className="text-primary" />
+                            <KeyRound size={32} />
                         ) : (
-                            <ShieldCheck size={32} className="text-primary" />
+                            <ShieldCheck size={32} />
                         )}
                     </div>
-                    <h2 className="font-display text-3xl font-bold uppercase tracking-tight text-current">
-                        {getTitle()}
-                    </h2>
+
+                    {/* 2. STATUS & TITLES */}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                            <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse"></span>
+                            <span className="font-mono text-[9px] uppercase tracking-[0.3em] opacity-60">Secure Connection</span>
+                        </div>
+                        <h2 className="font-display text-4xl font-black uppercase tracking-tighter text-transparent bg-clip-text bg-gradient-to-br from-current to-current/40">
+                            {titles.main}
+                        </h2>
+                        <p className="font-mono text-xs mt-2 opacity-60 uppercase tracking-widest text-primary">
+                            // {titles.sub}
+                        </p>
+                    </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                {/* --- FORM SECTION --- */}
+                <form onSubmit={handleSubmit} className="space-y-5">
 
-                    {/* --- VIEW: REGISTER ONLY --- */}
+                    {/* Register Fields */}
                     {view === 'register' && (
-                        <div className="grid grid-cols-2 gap-3">
-                            <input type="text" placeholder="First Name" className="bg-black/20 border border-white/5 p-4 rounded-2xl w-full text-sm outline-none focus:border-primary"
-                                value={firstName} onChange={e => setFirstName(e.target.value)} required />
-                            <input type="text" placeholder="Last Name" className="bg-black/20 border border-white/5 p-4 rounded-2xl w-full text-sm outline-none focus:border-primary"
-                                value={lastName} onChange={e => setLastName(e.target.value)} required />
+                        <div className="space-y-5 animate-in slide-in-from-bottom-4 fade-in duration-500">
+                            <div className="grid grid-cols-2 gap-4">
+                                <TechInput icon={User} type="text" placeholder="First Name" value={firstName} onChange={e => setFirstName(e.target.value)} required />
+                                <TechInput icon={User} type="text" placeholder="Last Name" value={lastName} onChange={e => setLastName(e.target.value)} required />
+                            </div>
+                            <TechInput icon={Phone} type="tel" placeholder="Mobile Number" value={phone} onChange={e => setPhone(e.target.value)} required />
                         </div>
                     )}
 
-                    {/* --- VIEW: LOGIN / REGISTER / FORGOT --- */}
+                    {/* Login/Common Fields */}
                     {view !== 'reset_password' && (
-                        <div className="relative group">
-                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30 group-focus-within:text-primary transition-colors" size={18} />
-                            <input
-                                type="email"
-                                placeholder="Email Address"
-                                className="w-full bg-black/20 border border-white/5 p-4 pl-12 rounded-2xl outline-none focus:border-primary transition-all text-sm"
+                        <div className="animate-in slide-in-from-bottom-4 fade-in duration-500 delay-100">
+                            <TechInput
+                                icon={Mail}
+                                type="text"
+                                placeholder={view === 'login' ? "Email or Phone Number" : "Email Address"}
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
@@ -151,96 +201,75 @@ export const LoginView = ({
                         </div>
                     )}
 
-                    {/* --- VIEW: LOGIN / REGISTER ONLY --- */}
+                    {/* Password Field */}
                     {(view === 'login' || view === 'register') && (
-                        <>
-                            <div className="relative group">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30 group-focus-within:text-primary transition-colors" size={18} />
-                                <input
+                        <div className="animate-in slide-in-from-bottom-4 fade-in duration-500 delay-200 relative">
+                            <div className="relative">
+                                <TechInput
+                                    icon={Lock}
                                     type={showPassword ? "text" : "password"}
                                     placeholder="Password"
-                                    className="w-full bg-black/20 border border-white/5 p-4 pl-12 pr-12 rounded-2xl outline-none focus:border-primary transition-all text-sm"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
                                 />
-                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 opacity-30 hover:opacity-100">
+                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 opacity-40 hover:opacity-100 hover:text-primary transition-colors z-20 text-current">
                                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
                             </div>
-                            {/* Forgot Password Link */}
                             {view === 'login' && (
-                                <div className="text-right">
+                                <div className="text-right mt-3">
                                     <button
                                         type="button"
                                         onClick={() => setView('forgot_password')}
-                                        className="text-[10px] uppercase font-bold opacity-40 hover:opacity-100 hover:text-primary transition-all"
+                                        className="text-[10px] font-mono uppercase opacity-50 hover:opacity-100 hover:text-primary transition-all underline decoration-dotted decoration-current/30 underline-offset-4"
                                     >
-                                        Forgot Password?
+                                        Recover Password
                                     </button>
                                 </div>
                             )}
-                        </>
+                        </div>
                     )}
 
-                    {/* --- VIEW: RESET PASSWORD (STEP 2) --- */}
+                    {/* Reset Password Fields */}
                     {view === 'reset_password' && (
-                        <>
-                            <div className="relative group">
-                                <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30 group-focus-within:text-primary transition-colors" size={18} />
-                                <input
-                                    type="text"
-                                    placeholder="Enter Reset Token"
-                                    className="w-full bg-black/20 border border-white/5 p-4 pl-12 rounded-2xl outline-none focus:border-primary transition-all text-sm font-mono"
-                                    value={resetToken}
-                                    onChange={(e) => setResetToken(e.target.value)}
-                                    required
-                                />
-                            </div>
-                            <div className="relative group">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30 group-focus-within:text-primary transition-colors" size={18} />
-                                <input
-                                    type="password"
-                                    placeholder="New Password"
-                                    className="w-full bg-black/20 border border-white/5 p-4 pl-12 rounded-2xl outline-none focus:border-primary transition-all text-sm"
-                                    value={newPassword}
-                                    onChange={(e) => setNewPassword(e.target.value)}
-                                    required
-                                />
-                            </div>
-                        </>
+                        <div className="space-y-5 animate-in slide-in-from-bottom-4 fade-in duration-500">
+                            <TechInput icon={KeyRound} type="text" placeholder="Enter Reset Token" value={resetToken} onChange={(e) => setResetToken(e.target.value)} required />
+                            <TechInput icon={Lock} type="password" placeholder="New Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
+                        </div>
                     )}
 
-                    {/* Submit Button */}
+                    {/* Action Button */}
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-primary text-black py-5 rounded-2xl font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-3 shadow-[0_15px_30px_-10px_var(--accent-color)] hover:scale-[1.02] active:scale-95 transition-all mt-6 disabled:opacity-50"
+                        className="w-full group relative bg-primary text-black h-16 mt-8 overflow-hidden rounded-lg font-black uppercase tracking-widest text-xs flex items-center justify-between px-8 hover:brightness-110 transition-all shadow-[0_10px_40px_-10px_var(--accent-color)]"
                     >
-                        {loading ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={18} />}
-                        {view === 'login' && "Sign In"}
-                        {view === 'register' && "Create Account"}
-                        {view === 'forgot_password' && "Send Reset Code"}
-                        {view === 'reset_password' && "Set New Password"}
+                        <div className="absolute inset-0 w-full h-full bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.3)_50%,transparent_75%)] bg-[length:250%_250%] group-hover:animate-shine opacity-0 group-hover:opacity-100 transition-opacity"></div>
+
+                        <span className="relative z-10 flex items-center gap-3">
+                            {loading ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} className="fill-black" />}
+                            {view === 'login' && "Authenticate"}
+                            {view === 'register' && "Initialize Account"}
+                            {view === 'forgot_password' && "Send Reset Link"}
+                            {view === 'reset_password' && "Update Credentials"}
+                        </span>
+
+                        <ArrowRight size={20} className="relative z-10 -translate-x-2 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all" />
                     </button>
                 </form>
 
-                {/* Footer Navigation */}
-                <div className="mt-8 text-center space-y-3">
-                    {view !== 'login' && (
-                        <button
-                            onClick={() => setView('login')}
-                            className="text-[10px] font-bold uppercase tracking-widest opacity-40 hover:opacity-100 hover:text-primary transition-all flex items-center justify-center gap-2 mx-auto"
-                        >
-                            <ArrowLeft size={12} /> Back to Login
+                {/* Footer / Toggle View */}
+                <div className="mt-10 pt-6 border-t border-current/10 flex justify-center">
+                    {view !== 'login' ? (
+                        <button onClick={() => setView('login')} className="group flex items-center gap-3 text-xs font-bold uppercase tracking-widest opacity-60 hover:opacity-100 transition-all">
+                            <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
+                            Back to Login
                         </button>
-                    )}
-                    {view === 'login' && (
-                        <button
-                            onClick={() => setView('register')}
-                            className="text-[10px] font-bold uppercase tracking-widest opacity-40 hover:opacity-100 hover:text-primary transition-all flex items-center justify-center gap-2 mx-auto"
-                        >
-                            Don't have an account? Sign Up <ArrowRight size={12} />
+                    ) : (
+                        <button onClick={() => setView('register')} className="group flex items-center gap-3 text-xs font-bold uppercase tracking-widest opacity-60 hover:opacity-100 transition-all">
+                            New User? Register
+                            <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                         </button>
                     )}
                 </div>

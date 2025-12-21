@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { ShoppingCart, Star, ArrowLeft, Loader2, X, ChevronLeft, ChevronRight, Lock, Zap } from 'lucide-react';
+import { ShoppingCart, Star, ArrowLeft, Loader2, X, ChevronLeft, ChevronRight, Lock, Zap, Share2, Copy, MessageCircle, Instagram } from 'lucide-react';
 import { formatCurrency } from '../utils/config.js';
 import clsx from 'clsx';
 
@@ -42,7 +42,6 @@ const RatingDisplay = ({ rating, size = 16, showScore = true }) => {
             ))}
             {hasHalfStar && (
                 <span className="relative inline-block mr-0.5">
-                    {/* The Background/Empty Star - Grey Fill + Border */}
                     <Star size={size} className="text-neutral-400/30 fill-neutral-400/20 border-black/10" strokeWidth={1.5} />
                     <div className="absolute top-0 left-0 overflow-hidden w-1/2">
                         <Star size={size} className="text-primary fill-primary" strokeWidth={0} />
@@ -70,10 +69,16 @@ const SteezeForm = ({ productId, reviews, user, onLoginClick, addReview, setNoti
     const [formVisible, setFormVisible] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
+    // --- FIX: Robust User Check ---
+    // Ensure 'user' is not just an empty object or null
+    const isLoggedIn = user && (user.id || user.username || user.email || user.user_id);
+
     const hasAlreadyRated = useMemo(() => {
-        if (!user) return false;
-        return reviews.some(r => r.user_name === user.username || r.user_name === user.name);
-    }, [reviews, user]);
+        if (!isLoggedIn) return false;
+        // Check against both username and name to be safe
+        const userName = user.username || user.name || user.email;
+        return reviews.some(r => r.user_name === userName);
+    }, [reviews, user, isLoggedIn]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -81,24 +86,25 @@ const SteezeForm = ({ productId, reviews, user, onLoginClick, addReview, setNoti
 
         setSubmitting(true);
         try {
+            const userName = user.username || user.name || "Anonymous";
+
             const response = await fetch(REVIEWS_API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     product_id: parseInt(productId),
-                    user_name: user.username || user.name,
+                    user_name: userName,
                     rating: rating,
                     comment: comment.trim() || "Style Validated."
                 }),
             });
 
-            const rawText = await response.text(); // Get raw text first
+            const rawText = await response.text();
             let data;
 
             try {
                 data = JSON.parse(rawText);
             } catch (err) {
-                // If it's not JSON, it's a PHP error. Log the actual HTML so we can read it.
                 console.error("PHP Error Found:", rawText);
                 throw new Error("SERVER_CRASHED_CHECK_CONSOLE");
             }
@@ -108,7 +114,7 @@ const SteezeForm = ({ productId, reviews, user, onLoginClick, addReview, setNoti
             addReview({
                 rating,
                 comment: comment.trim() || "Style Validated.",
-                user_name: user.username || user.name,
+                user_name: userName,
                 created_at: 'JUST NOW'
             });
 
@@ -120,7 +126,9 @@ const SteezeForm = ({ productId, reviews, user, onLoginClick, addReview, setNoti
         } finally { setSubmitting(false); }
     };
 
-    if (!user) return (
+    // --- RENDER LOGIC ---
+    // If NOT logged in, show lock.
+    if (!isLoggedIn) return (
         <div className="p-4 border-2 border-dashed border-black/10 dark:border-white/10 rounded-3xl bg-card/50 flex flex-col items-center justify-center text-center group shadow-sm">
             <Lock className="text-gray-400 mb-2" size={18} />
             <button
@@ -133,6 +141,7 @@ const SteezeForm = ({ productId, reviews, user, onLoginClick, addReview, setNoti
         </div>
     );
 
+    // If logged in AND already rated, show logged message.
     if (hasAlreadyRated) return (
         <div className="p-4 border-2 border-primary/20 bg-primary/5 rounded-3xl text-center shadow-inner">
             <Zap className="mx-auto mb-1 text-primary animate-pulse" size={18} />
@@ -140,11 +149,12 @@ const SteezeForm = ({ productId, reviews, user, onLoginClick, addReview, setNoti
         </div>
     );
 
+    // If logged in AND hasn't rated, show form button.
     return (
         <div>
             {!formVisible ? (
                 <button onClick={() => setFormVisible(true)} className="w-full py-4 border-2 border-dashed border-primary/30 rounded-3xl text-[9px] font-mono text-primary hover:bg-primary/5 transition-all uppercase tracking-widest font-bold">
-                    + Record Steeze
+                    + Rate Steeze
                 </button>
             ) : (
                 <form onSubmit={handleSubmit} className="bg-card p-4 rounded-3xl border-2 border-primary/20 space-y-3 shadow-xl animate-in fade-in zoom-in-95">
@@ -156,8 +166,6 @@ const SteezeForm = ({ productId, reviews, user, onLoginClick, addReview, setNoti
                                 onClick={() => setRating(s)}
                                 className={clsx(
                                     "cursor-pointer transition-all hover:scale-110",
-                                    // If selected: Use Primary color
-                                    // If not selected: Use Grey Fill + Border for visibility on white
                                     s <= rating
                                         ? "text-primary fill-primary"
                                         : "text-neutral-400 fill-neutral-200 dark:fill-white/10"
@@ -187,7 +195,7 @@ export const ProductDetail = ({
     navigateToShop,
     addToCart,
     setNotification,
-    headerStyle = 'dark' // Added to track background state
+    headerStyle = 'dark'
 }) => {
     const [reviews, setReviews] = useState([]);
     const [reviewsLoading, setReviewsLoading] = useState(false);
@@ -212,6 +220,27 @@ export const ProductDetail = ({
 
     const averageRating = useMemo(() => reviews.length ? reviews.reduce((s, r) => s + Number(r.rating), 0) / reviews.length : 0, [reviews]);
 
+    // --- SHARE LOGIC ---
+    const handleShare = async (platform) => {
+        const text = `Check out this drip: ${product.name}`;
+        const url = window.location.href;
+
+        if (platform === 'native') {
+            if (navigator.share) {
+                try {
+                    await navigator.share({ title: product.name, text: text, url: url });
+                } catch (err) { console.log('Share cancelled'); }
+            } else {
+                handleShare('copy'); // Fallback
+            }
+        } else if (platform === 'whatsapp') {
+            window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank');
+        } else if (platform === 'copy') {
+            await navigator.clipboard.writeText(url);
+            setNotification({ message: "LINK COPIED TO CLIPBOARD", type: 'success' });
+        }
+    };
+
     return (
         <div className="max-w-7xl mx-auto pt-24 md:pt-32 pb-20 px-4 md:px-8">
             <div className="flex items-center justify-between mb-8 md:mb-10 border-b-2 md:border-b-4 border-black/5 dark:border-white/5 pb-4 md:pb-6">
@@ -225,23 +254,25 @@ export const ProductDetail = ({
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-16 items-start">
+                {/* LEFT: IMAGE GALLERY */}
                 <div className="space-y-4 md:space-y-6">
                     <div className="relative aspect-square bg-card border-4 md:border-8 border-black/5 dark:border-white/10 rounded-[2.5rem] md:rounded-[4rem] overflow-hidden p-4 md:p-10 group shadow-2xl">
                         <div className="absolute top-0 left-0 w-12 md:w-24 h-12 md:h-24 border-t-8 md:border-t-[12px] border-l-8 md:border-l-[12px] border-primary rounded-tl-[2.5rem] md:rounded-tl-[4rem] z-10" />
                         <div className="absolute bottom-0 right-0 w-12 md:w-24 h-12 md:h-24 border-b-8 md:border-b-[12px] border-r-8 md:border-r-[12px] border-primary rounded-br-[2.5rem] md:rounded-br-[4rem] z-10" />
                         <div className="w-full h-full rounded-[1.5rem] md:rounded-[3rem] overflow-hidden bg-black/5 dark:bg-black/20 relative shadow-inner">
-                            <img src={currentImage} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 cursor-zoom-in" onClick={() => { setModalIndex(images.indexOf(currentImage)); setIsModalOpen(true); }} />
+                            <img src={currentImage} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 cursor-zoom-in" onClick={() => { setModalIndex(images.indexOf(currentImage)); setIsModalOpen(true); }} alt={product.name} />
                         </div>
                     </div>
                     <div className="flex gap-3 md:gap-4 overflow-x-auto pb-2 scrollbar-hide">
                         {images.map((img, i) => (
                             <button key={i} onClick={() => setCurrentImage(img)} className={clsx("w-16 md:w-24 h-16 md:h-24 flex-shrink-0 rounded-[1.5rem] md:rounded-[2rem] border-4 transition-all shadow-sm", img === currentImage ? "border-primary bg-primary/10 scale-95" : "border-black/5 dark:border-white/10 opacity-50")}>
-                                <img src={img} className="w-full h-full object-cover rounded-xl" />
+                                <img src={img} className="w-full h-full object-cover rounded-xl" alt="thumbnail" />
                             </button>
                         ))}
                     </div>
                 </div>
 
+                {/* RIGHT: DETAILS */}
                 <div className="flex flex-col">
                     <div className="mb-6 md:mb-10">
                         <div className="flex items-center gap-4 mb-4 md:mb-6">
@@ -263,12 +294,12 @@ export const ProductDetail = ({
                             {product.on_sale && <span className="text-sm md:text-2xl text-gray-400 line-through font-mono">{formatCurrency(product.price, currentCurrency)}</span>}
                         </div>
                         <p className="text-[11px] md:text-sm text-gray-500 dark:text-gray-400 uppercase tracking-tighter leading-relaxed border-l-[8px] md:border-l-[12px] border-primary pl-6 md:pl-10 py-1 md:py-3">
-                            {product.description || "Experimental design series. Optimized for peak steeze threshold."}
+                            {product.description || " Custom design series. Optimized for peak steeze."}
                         </p>
                     </div>
 
-                    {/* CORE CTA: BAG IT (Theme-Adaptive Background) */}
-                    <div className="flex gap-4 md:gap-6 p-4 md:p-6 bg-card rounded-[2rem] md:rounded-[4rem] border-4 md:border-8 border-black/5 dark:border-white/10 shadow-2xl mb-8">
+                    {/* CORE CTA: BAG IT */}
+                    <div className="flex gap-4 md:gap-6 p-4 md:p-6 bg-card rounded-[2rem] md:rounded-[4rem] border-4 md:border-8 border-black/5 dark:border-white/10 shadow-2xl mb-4">
                         <input
                             type="number" min="1" value={quantity}
                             onChange={e => setQuantity(Math.max(1, parseInt(e.target.value)))}
@@ -279,26 +310,31 @@ export const ProductDetail = ({
                                 addToCart(product, quantity);
                                 setNotification({ message: `${product.name.toUpperCase()} BAGGED`, type: 'success' });
                             }}
-                            // Logic: If headerStyle is light (White BG), button becomes White with Black/Primary accents.
-                            // If headerStyle is dark, button becomes Black with Primary accents.
                             className={clsx(
                                 "flex-1 relative group overflow-hidden border-4 border-primary rounded-2xl md:rounded-[2.5rem] font-heading font-black uppercase text-base md:text-2xl tracking-[0.2em] hover:scale-[1.02] active:scale-95 transition-all shadow-[0_0_30px_-5px_var(--accent-color)]",
                                 headerStyle === 'light' ? "bg-white text-black" : "bg-neutral-950 text-white"
                             )}
                             style={{ '--accent-color': 'var(--accent-color)' }}
                         >
-                            {/* Hover overlay that reacts to the theme */}
-                            <span className={clsx(
-                                "absolute inset-0 translate-y-full group-hover:translate-y-0 transition-transform duration-500 pointer-events-none",
-                                headerStyle === 'light' ? "bg-black/5" : "bg-white/10"
-                            )} />
-
+                            <span className={clsx("absolute inset-0 translate-y-full group-hover:translate-y-0 transition-transform duration-500 pointer-events-none", headerStyle === 'light' ? "bg-black/5" : "bg-white/10")} />
                             <span className="relative z-10 flex items-center justify-center gap-3 md:gap-5">
-                                {/* The icon now strictly follows the Price color (Primary) */}
                                 <ShoppingCart size={28} className="fill-primary/20 text-primary" />
-                                {/* The text now strictly follows the Price color (Primary) */}
                                 <span className="italic text-primary">Bag It</span>
                             </span>
+                        </button>
+                    </div>
+
+                    {/* SHARE SECTION */}
+                    <div className="flex items-center gap-2 mb-8 justify-end px-4">
+                        <span className="text-[9px] font-mono uppercase tracking-widest opacity-50 mr-2">Share the Drip:</span>
+                        <button onClick={() => handleShare('whatsapp')} className="p-3 rounded-full bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366] hover:text-white transition-all border border-[#25D366]/20">
+                            <MessageCircle size={18} />
+                        </button>
+                        <button onClick={() => handleShare('native')} className="p-3 rounded-full bg-pink-500/10 text-pink-500 hover:bg-pink-500 hover:text-white transition-all border border-pink-500/20">
+                            <Instagram size={18} />
+                        </button>
+                        <button onClick={() => handleShare('copy')} className="p-3 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-black transition-all border border-primary/20">
+                            <Copy size={18} />
                         </button>
                     </div>
 
@@ -306,7 +342,7 @@ export const ProductDetail = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                         <div className="bg-card border-4 border-black/5 dark:border-white/10 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] flex items-center justify-between shadow-lg relative overflow-hidden">
                             <div className="z-10">
-                                <span className="text-[9px] font-mono text-gray-500 uppercase tracking-widest block mb-1 italic">Mean_Steeze</span>
+                                <span className="text-[9px] font-mono text-gray-500 uppercase tracking-widest block mb-1 italic">Steeze</span>
                                 <span className="text-4xl md:text-6xl font-heading italic font-black text-primary leading-none tracking-tighter drop-shadow-sm">{averageRating.toFixed(1)}</span>
                             </div>
                             <div className="z-10 flex flex-col items-end gap-1 md:gap-3">
@@ -329,7 +365,7 @@ export const ProductDetail = ({
 
             {/* Steeze Logs */}
             <div className="mt-24 md:mt-32 pt-12 md:pt-16 border-t-8 border-black/5 dark:border-white/5">
-                <h2 className="text-3xl md:text-5xl font-heading font-black uppercase italic text-current mb-8 md:mb-12">Steeze_Repository_Logs</h2>
+                <h2 className="text-3xl md:text-2xl font-heading font-black uppercase italic text-current mb-8 md:mb-12">Product Reviews</h2>
                 {reviewsLoading ? (
                     <div className="flex justify-center py-20"><Loader2 className="animate-spin text-primary" size={64} /></div>
                 ) : (

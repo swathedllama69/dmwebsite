@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
  * Used for the 'Process' section at the bottom.
  */
 const ImageSlideshow = ({ images, interval = 7000 }) => {
+    // ... (No changes needed here, keep your existing code for ImageSlideshow)
     const [currentIndex, setCurrentIndex] = useState(0);
     const totalImages = images.length;
     const slidesPerView = 2;
@@ -94,6 +95,7 @@ const getDiscountPercentage = (price, salePrice) => {
 
 // --- Vertical ProductCard ---
 export const ProductCard = ({ product, currentCurrency, addToCart, setProductId, setNotification }) => {
+    // ... (Keep existing ProductCard code exactly as is)
     const primaryImage = getPrimaryImage(product.images);
     const discount = getDiscountPercentage(product.price, product.sale_price);
 
@@ -170,6 +172,7 @@ export const ProductCard = ({ product, currentCurrency, addToCart, setProductId,
 
 // --- Horizontal Product Card ---
 const HorizontalProductCard = ({ product, currentCurrency, addToCart, setProductId, setNotification }) => {
+    // ... (Keep existing HorizontalProductCard code exactly as is)
     const primaryImage = getPrimaryImage(product.images);
     const discount = getDiscountPercentage(product.price, product.sale_price);
 
@@ -212,6 +215,7 @@ const HorizontalProductCard = ({ product, currentCurrency, addToCart, setProduct
 
 // --- Hero Section ---
 const HeroSection = ({ settings }) => {
+    // ... (Keep existing HeroSection code exactly as is)
     const opacityVal = settings.heroOverlayOpacity ? parseInt(settings.heroOverlayOpacity) / 100 : 0.5;
 
     return (
@@ -251,6 +255,7 @@ const HeroSection = ({ settings }) => {
 
 // --- ScrollingBanner (Marquee) ---
 const ScrollingBanner = ({ settings }) => {
+    // ... (Keep existing ScrollingBanner code exactly as is)
     if (!settings.scrollingText) return null;
     return (
         <div className="bg-primary overflow-hidden py-4 whitespace-nowrap border-y border-black">
@@ -283,6 +288,9 @@ const ImageGallery = ({ settings }) => {
     const linksString = settings.galleryLinks;
     const galleryTitle = settings.gallerySectionTitle || "Innovation Gallery";
 
+    // <--- UPDATED: Fetch dynamic subtitle
+    const gallerySub = settings.gallerySectionSub || "See what's new";
+
     const images = (imagesString || '').split(',').map(url => url.trim()).filter(url => url.length > 5);
     const links = (linksString || '').split(',').map(url => url.trim());
 
@@ -295,6 +303,12 @@ const ImageGallery = ({ settings }) => {
                 <h2 className="font-heading text-4xl md:text-5xl uppercase text-current text-center tracking-tighter italic">
                     {galleryTitle}
                 </h2>
+
+                {/* <--- UPDATED: Display dynamic subtitle */}
+                <p className="text-gray-500 font-body text-xs uppercase tracking-[0.2em] mt-2 italic">
+                    {gallerySub}
+                </p>
+
                 <div className="w-24 h-1 bg-primary mt-6 rounded-full opacity-50" />
             </div>
 
@@ -371,7 +385,8 @@ export const ShopView = ({
     const isNewArrivalsVisible = settings.showNewArrivals === '1';
     const isSaleItemsVisible = settings.showSaleItems === '1';
 
-    const renderProductGrid = (items, title, id, isHorizontalScroll = false) => {
+    // <--- UPDATED: Added `subtitle` argument to function signature
+    const renderProductGrid = (items, title, subtitle, id, isHorizontalScroll = false) => {
         if (id === 'featured-grid' && loading) {
             return (
                 <div className="text-center py-32 flex flex-col items-center">
@@ -386,9 +401,13 @@ export const ShopView = ({
             return (
                 <section id={id} className={`my-20 border-t border-black/5 dark:border-white/5 pt-16`}>
                     <div className="flex justify-between items-end px-4 md:px-8 mb-10 max-w-[1600px] mx-auto">
-                        <h2 className="font-heading text-3xl md:text-4xl uppercase text-current tracking-tighter italic">
-                            {title}
-                        </h2>
+                        <div className="flex flex-col">
+                            <h2 className="font-heading text-3xl md:text-4xl uppercase text-current tracking-tighter italic">
+                                {title}
+                            </h2>
+                            {/* <--- UPDATED: Display subtitle for horizontal scroll too */}
+                            {subtitle && <p className="text-gray-500 font-body text-xs uppercase tracking-[0.2em] mt-1 italic">{subtitle}</p>}
+                        </div>
                         <div className="hidden md:flex items-center gap-2">
                             <span className="w-2 h-2 bg-primary rounded-full animate-pulse" />
                             <span className="text-[10px] font-body font-bold uppercase tracking-widest text-gray-400">Live Stock</span>
@@ -416,6 +435,12 @@ export const ShopView = ({
                     <h2 className="font-heading text-4xl md:text-5xl uppercase text-current tracking-tighter italic">
                         {title}
                     </h2>
+                    {/* <--- UPDATED: Render the dynamic subtitle */}
+                    {subtitle && (
+                        <p className="text-gray-500 font-body text-xs uppercase tracking-[0.2em] mt-2 italic">
+                            {subtitle}
+                        </p>
+                    )}
                     <div className="w-16 h-[2px] bg-primary mt-4" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-[1600px] mx-auto">
@@ -446,7 +471,14 @@ export const ShopView = ({
                     <ScrollingBanner settings={settings} />
 
                     <div className="pb-8">
-                        {renderProductGrid(featuredItems, settings.featuredSectionTitle || 'FEATURED DRIPS', 'featured-grid', false)}
+                        {/* <--- UPDATED: Passing Titles AND Subtitles */}
+                        {renderProductGrid(
+                            featuredItems,
+                            settings.featuredSectionTitle || 'FEATURED DRIPS',
+                            settings.featuredSectionSub || 'Top rated items', // Default fallback
+                            'featured-grid',
+                            false
+                        )}
 
                         {(featuredItems.length > 0 || (isNewArrivalsVisible && newArrivalItems.length > 0)) && (
                             <div className="text-center my-16">
@@ -459,11 +491,25 @@ export const ShopView = ({
                             </div>
                         )}
 
-                        {isNewArrivalsVisible && renderProductGrid(newArrivalItems, settings.newArrivalsTitle || 'LATEST DROPS', 'new-arrivals-row', true)}
+                        {/* <--- UPDATED: Passing Titles AND Subtitles for New Arrivals */}
+                        {isNewArrivalsVisible && renderProductGrid(
+                            newArrivalItems,
+                            settings.newArrivalsTitle || 'LATEST DROPS',
+                            settings.newArrivalsSub || 'Fresh from the lab',
+                            'new-arrivals-row',
+                            true
+                        )}
 
                         <ImageGallery settings={settings} />
 
-                        {isSaleItemsVisible && renderProductGrid(saleItems, settings.saleSectionTitle || 'THE VAULT', 'sale-grid', false)}
+                        {/* <--- UPDATED: Passing Titles AND Subtitles for Sales */}
+                        {isSaleItemsVisible && renderProductGrid(
+                            saleItems,
+                            settings.saleSectionTitle || 'THE VAULT',
+                            settings.saleSectionSub || 'Exclusive Deals',
+                            'sale-grid',
+                            false
+                        )}
                     </div>
 
                     {bottomBannerImages.length > 0 && (

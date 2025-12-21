@@ -2,17 +2,17 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
     Package, ChevronDown, Clock,
     CheckCircle, XCircle, Truck,
-    ShoppingBag, Loader2, FileText, Download,
-    Eye, Printer
+    ShoppingBag, Loader2, FileText,
+    Eye, Printer, X, MapPin,
+    Instagram, Twitter, Mail
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../utils/config.js';
 
 // --- CONFIGURATION ---
 const formatOrderId = (id) => `ORD-${parseInt(id) + 8800}`;
-
-// UPDATE: Using the likely public URL for your logo based on the path provided
 const LOGO_URL = "https://devoltmould.com.ng/resources/devolt_logo.png";
+const WEBSITE_URL = "www.devoltmould.com.ng";
 
 const formatPrice = (cents, currency) => {
     if (!cents && cents !== 0) return '---';
@@ -29,107 +29,205 @@ const formatPrice = (cents, currency) => {
     }
 };
 
-// --- PRINT LOGIC ---
-const handlePrintDocument = (order) => {
-    if (!order) return;
+// --- INVOICE MODAL COMPONENT ---
+const InvoiceModal = ({ order, onClose }) => {
+    if (!order) return null;
 
-    let docType = '';
-    const status = order.status;
+    const docDate = new Date(order.created_at).toLocaleDateString();
 
-    if (status === 'Pending') {
-        docType = 'INVOICE';
-    } else if (['Processing', 'Shipped', 'Completed'].includes(status)) {
-        docType = 'RECEIPT';
-    } else if (status === 'Cancelled') {
-        alert("This order is Cancelled. No invoice or receipt available.");
-        return;
-    }
+    const handlePrint = () => {
+        // 1. Store original title
+        const originalTitle = document.title;
 
-    const fmt = (cents) => {
-        return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(cents / 100);
+        // 2. Create custom filename: FirstName_OrderNumber
+        const firstName = order.customer_name ? order.customer_name.split(' ')[0] : 'Customer';
+        const orderId = order.order_number_display || formatOrderId(order.id);
+        const fileName = `${firstName}_${orderId}`;
+
+        // 3. Set title (Browsers use this for the PDF filename)
+        document.title = fileName;
+
+        // 4. Print
+        window.print();
+
+        // 5. Restore title after delay
+        setTimeout(() => {
+            document.title = originalTitle;
+        }, 1000);
     };
 
-    // Safely map items, defaulting to empty array if missing
-    const itemsHtml = (order.items || []).map(item => `
-      <tr>
-        <td>${item.product_name}</td>
-        <td>${item.quantity}</td>
-        <td>${fmt(item.price ? item.price * 100 : (item.price_cents || 0))}</td>
-        <td>${fmt((item.price ? item.price * 100 : (item.price_cents || 0)) * item.quantity)}</td>
-      </tr>
-    `).join('');
+    return (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
 
-    const printWindow = window.open('', '_blank', 'width=900,height=800');
+            {/* --- CSS FOR PRINTING --- */}
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap');
+                
+                @media print {
+                    /* 1. Setup A4 Page */
+                    @page { 
+                        size: A4; 
+                        margin: 0; 
+                    }
+                    
+                    /* 2. Reset Body to allow full page printing (Fixes blank page) */
+                    html, body {
+                        height: 100%;
+                        width: 100%;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        overflow: visible !important;
+                    }
 
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>${docType} #${order.order_number_display || formatOrderId(order.id)}</title>
-        <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-        <style>
-          body { font-family: 'Helvetica', sans-serif; padding: 40px; color: #333; }
-          .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
-          
-          /* Logo Styling */
-          .brand-container { display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 10px; }
-          .logo-img { height: 60px; width: auto; object-fit: contain; }
-          .brand-name { font-family: 'Cinzel', serif; font-size: 36px; font-weight: 700; text-transform: uppercase; margin: 0; letter-spacing: 2px; }
-          
-          .contact { font-size: 12px; color: #555; margin-top: 5px; line-height: 1.5; }
-          .doc-title { text-align: right; font-size: 24px; font-weight: bold; margin-bottom: 10px; font-family: 'Cinzel', serif; letter-spacing: 1px; }
-          .meta { text-align: right; font-size: 12px; margin-bottom: 30px; line-height: 1.5; }
-          
-          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-          th { text-align: left; background: #eee; padding: 12px; font-family: 'Cinzel', serif; font-weight: 700; font-size: 14px; }
-          td { padding: 12px; border-bottom: 1px solid #ddd; font-size: 14px; }
-          .total { text-align: right; font-size: 18px; font-weight: bold; margin-top: 20px; padding-top: 10px; border-top: 2px solid #eee; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-           <div class="brand-container">
-               <img src="${LOGO_URL}" class="logo-img" alt="Logo" onerror="this.style.display='none'" />
-               <h1 class="brand-name">-DEVOLT-</h1>
-           </div>
-           <div class="contact">
-             <div>08146068754 &bull; sales@devoltmould.com.ng</div>
-             <div>@devolt.mould &bull; @devolt_mould</div>
-           </div>
+                    /* 3. Hide all other UI elements */
+                    body * {
+                        visibility: hidden;
+                    }
+
+                    /* 4. Show ONLY the receipt and its children */
+                    #printable-receipt, #printable-receipt * {
+                        visibility: visible;
+                    }
+
+                    /* 5. Position receipt perfectly on the paper */
+                    #printable-receipt {
+                        position: absolute;
+                        left: 0;
+                        top: 0;
+                        width: 100%; /* Full A4 width */
+                        max-width: 210mm; /* A4 width standard */
+                        min-height: 100vh;
+                        margin: 0;
+                        padding: 40px; /* Comfortable padding */
+                        background: white;
+                        box-shadow: none !important;
+                        border: none !important;
+                        overflow: visible !important;
+                        color: black !important;
+                    }
+
+                    /* 6. Utility Hides */
+                    .no-print { display: none !important; }
+                    
+                    /* 7. Force colors */
+                    .text-gray-400, .text-gray-500, .text-gray-600 { color: #000 !important; }
+                }
+            `}</style>
+
+            {/* Modal Box */}
+            <div
+                id="printable-receipt"
+                className="bg-white text-black w-full max-w-md rounded-xl shadow-2xl relative animate-in fade-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]"
+            >
+
+                {/* Close Button (Hidden on Print) */}
+                <button
+                    onClick={onClose}
+                    className="no-print absolute top-3 right-3 z-10 p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors text-gray-600"
+                >
+                    <X size={20} />
+                </button>
+
+                {/* --- CONTENT AREA --- */}
+                <div className="p-8 overflow-y-auto print:overflow-visible print:p-0">
+
+                    {/* Header */}
+                    <div className="flex flex-col items-center text-center border-b border-dashed border-gray-300 pb-6 mb-6 print:border-black">
+                        <img src={LOGO_URL} alt="Devolt Logo" className="h-14 w-auto object-contain mb-2" />
+
+                        <div className="text-2xl font-black tracking-widest uppercase mb-1" style={{ fontFamily: "'Cinzel', serif" }}>
+                            - DEVOLT -
+                        </div>
+
+                        <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-4">Moulding the New Standard</p>
+
+                        <div className="w-full flex justify-between items-center text-xs border-t border-dashed border-gray-200 pt-4 print:border-black">
+                            <div className="text-left">
+                                <span className="block text-gray-400 uppercase tracking-wider text-[10px]">Order ID</span>
+                                <span className="font-mono font-bold">#{order.order_number_display || formatOrderId(order.id)}</span>
+                            </div>
+                            <div className="text-right">
+                                <span className="block text-gray-400 uppercase tracking-wider text-[10px]">Date</span>
+                                <span className="font-mono font-bold">{docDate}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Customer Info */}
+                    <div className="mb-8 text-sm">
+                        <p className="font-bold uppercase text-[10px] text-gray-400 tracking-widest mb-2 border-b border-gray-100 pb-1 print:border-black print:text-black">Billed To</p>
+                        <p className="font-bold text-lg">{order.customer_name || 'Valued Customer'}</p>
+                        <p className="text-gray-600">{order.shipping_address}</p>
+                        <p className="text-gray-600">{order.shipping_city} {order.shipping_zip}</p>
+                        <p className="text-gray-600 mt-1 text-xs">{order.customer_email}</p>
+                    </div>
+
+                    {/* Items */}
+                    <div className="mb-8">
+                        <p className="font-bold uppercase text-[10px] text-gray-400 tracking-widest mb-3 border-b border-gray-100 pb-1 print:border-black print:text-black">Items</p>
+                        <div className="space-y-4">
+                            {order.items && order.items.map((item, i) => (
+                                <div key={i} className="flex justify-between text-sm items-start">
+                                    <div className="pr-4 flex-1">
+                                        <div className="font-bold">{item.product_name}</div>
+                                        <div className="text-[10px] text-gray-500 uppercase tracking-wide mt-0.5">
+                                            Qty: {item.quantity} {item.size ? `• Size: ${item.size}` : ''}
+                                        </div>
+                                    </div>
+                                    <div className="font-mono text-right font-medium">
+                                        {formatPrice((item.price ? item.price * 100 : item.price_cents) * item.quantity)}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Total */}
+                    <div className="border-t-2 border-black pt-4 mb-8 flex justify-between items-end">
+                        <div className="text-xs text-gray-500 print:text-black">Total Amount</div>
+                        <div className="text-2xl font-black font-display">{formatPrice(order.total_cents)}</div>
+                    </div>
+
+                    {/* Footer / Socials */}
+                    <div className="mt-auto pt-8 border-t border-gray-100 print:border-black">
+                        <div className="flex flex-col items-center justify-center space-y-3 text-center">
+
+                            <div className="text-[10px] text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                                <MapPin size={10} /> Abuja, Federal Capital Territory
+                            </div>
+
+                            <div className="flex items-center gap-4 text-xs font-medium text-gray-600 print:text-black">
+                                <div className="flex items-center gap-1.5">
+                                    <Instagram size={14} />
+                                    <Twitter size={14} />
+                                    <span>@devolt_mould</span>
+                                </div>
+                                <div className="w-1 h-1 bg-gray-300 rounded-full print:bg-black"></div>
+                                <div className="flex items-center gap-1.5">
+                                    <Mail size={14} />
+                                    <span>sales@devoltmould.com.ng</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Print/Save Button (Hidden on Print) */}
+                <div className="p-4 bg-gray-50 border-t border-gray-100 no-print rounded-b-xl">
+                    <button
+                        onClick={handlePrint}
+                        className="w-full flex items-center justify-center gap-2 bg-black text-white py-3 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-gray-800 transition-colors"
+                    >
+                        <Printer size={16} /> Save / Print Receipt
+                    </button>
+                </div>
+
+            </div>
         </div>
-
-        <div class="doc-title">${docType}</div>
-        <div class="meta">
-          <strong>Order ID:</strong> ${order.order_number_display || formatOrderId(order.id)}<br/>
-          <strong>Date:</strong> ${new Date(order.created_at).toLocaleDateString()}<br/>
-          <strong>Customer:</strong> ${order.customer_name || order.shipping_name || 'Valued Customer'}
-        </div>
-
-        <table>
-          <thead>
-            <tr><th>Description</th><th>Qty</th><th>Price</th><th>Total</th></tr>
-          </thead>
-          <tbody>
-            ${itemsHtml || '<tr><td colspan="4" style="text-align:center; padding:20px;">No items found</td></tr>'}
-          </tbody>
-        </table>
-
-        <div class="total">
-          Total: ${fmt(order.total_cents)}
-        </div>
-
-        <script>
-           // Print automatically when loaded
-           window.onload = function() { window.print(); };
-        </script>
-      </body>
-      </html>
-    `;
-
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
+    );
 };
 
+// ... (Order Status Badge & CustomerOrders Component remain unchanged below) ...
 const OrderStatusBadge = ({ status }) => {
     const s = status?.toLowerCase() || '';
     const styles = {
@@ -158,8 +256,9 @@ export const CustomerOrders = ({ userId, currentCurrency, setNotification }) => 
     const [loading, setLoading] = useState(true);
     const [expandedOrder, setExpandedOrder] = useState(null);
     const [fetchingDetails, setFetchingDetails] = useState({});
+    const [selectedInvoice, setSelectedInvoice] = useState(null);
 
-    // --- 1. FETCH ORDERS LIST (Summary Only) ---
+    // --- FETCH ORDERS LIST ---
     const fetchOrders = useCallback(async () => {
         if (!userId) { setLoading(false); return; }
         try {
@@ -176,12 +275,9 @@ export const CustomerOrders = ({ userId, currentCurrency, setNotification }) => 
 
     useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
-    // --- 2. FETCH SINGLE DETAILS (Helper Function) ---
-    // Returns the data directly so we don't have to wait for State update
+    // --- FETCH DETAILS ---
     const fetchOrderDetails = async (orderId) => {
         const currentOrder = orders.find(o => o.id === orderId);
-
-        // If we already have items, just return the current order
         if (currentOrder && Array.isArray(currentOrder.items) && currentOrder.items.length > 0) {
             return currentOrder;
         }
@@ -190,19 +286,16 @@ export const CustomerOrders = ({ userId, currentCurrency, setNotification }) => 
         try {
             const response = await fetch(`${API_BASE_URL}/orders.php?action=get_order&id=${orderId}`);
             const data = await response.json();
+            let details = Array.isArray(data) ? data[0] : (data.success ? data.order : data);
 
-            let details = data.success ? data.order : data;
+            if (!details) throw new Error("Invalid order data");
 
-            // Fix JSON string parsing
             if (details.items && typeof details.items === 'string') {
                 try { details.items = JSON.parse(details.items); } catch (e) { details.items = []; }
             }
             if (!Array.isArray(details.items)) details.items = [];
 
-            // Update React State
             setOrders(prev => prev.map(o => o.id === orderId ? { ...o, items: details.items } : o));
-
-            // Return the full order object with items
             return { ...currentOrder, ...details };
 
         } catch (err) {
@@ -216,29 +309,19 @@ export const CustomerOrders = ({ userId, currentCurrency, setNotification }) => 
     const toggleOrder = (orderId) => {
         const isExpanding = expandedOrder !== orderId;
         setExpandedOrder(isExpanding ? orderId : null);
-        // Only fetch if we are opening it
         if (isExpanding) fetchOrderDetails(orderId);
     };
 
-    // --- 3. PRINT HANDLER (Fix for Empty Items) ---
-    const handleViewReceipt = async (e, order) => {
-        e.stopPropagation(); // Stop row from toggling
-
-        let orderToPrint = order;
-
-        // Check if items are missing
-        if (!order.items || !Array.isArray(order.items) || order.items.length === 0) {
-            // Show loading cursor or logic here if desired
-            const updatedOrder = await fetchOrderDetails(order.id);
-            if (updatedOrder) {
-                orderToPrint = updatedOrder;
-            } else {
-                alert("Could not load items. Please try again.");
-                return;
-            }
+    // --- OPEN RECEIPT MODAL ---
+    const handleOpenInvoice = async (e, order) => {
+        e.stopPropagation();
+        if (!order.items || order.items.length === 0) {
+            const fullDetails = await fetchOrderDetails(order.id);
+            if (fullDetails) setSelectedInvoice(fullDetails);
+            else alert("Could not load invoice data.");
+        } else {
+            setSelectedInvoice(order);
         }
-
-        handlePrintDocument(orderToPrint);
     };
 
     const handleViewFullOrder = (e, orderId) => {
@@ -256,122 +339,114 @@ export const CustomerOrders = ({ userId, currentCurrency, setNotification }) => 
     );
 
     return (
-        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="flex items-center justify-between pb-4 border-b border-white/10">
-                <div><h2 className="text-xl font-display font-bold italic uppercase">Order History</h2></div>
-                <div className="bg-primary/10 text-primary px-3 py-1.5 rounded-lg text-[10px] font-black border border-primary/20">{orders.length} ITEMS</div>
-            </div>
+        <>
+            {/* Invoice Modal Overlay */}
+            {selectedInvoice && (
+                <InvoiceModal order={selectedInvoice} onClose={() => setSelectedInvoice(null)} />
+            )}
 
-            <div className="grid gap-3">
-                {orders.map((order) => {
-                    const isPending = order.status?.toLowerCase() === 'pending';
-                    const isLoadingDetails = fetchingDetails[order.id];
+            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="flex items-center justify-between pb-4 border-b border-white/10">
+                    <div><h2 className="text-xl font-display font-bold italic uppercase">Order History</h2></div>
+                    <div className="bg-primary/10 text-primary px-3 py-1.5 rounded-lg text-[10px] font-black border border-primary/20">{orders.length} ITEMS</div>
+                </div>
 
-                    return (
-                        <div key={order.id} className={`bg-card border border-white/5 text-current rounded-2xl overflow-hidden transition-all duration-300 ${expandedOrder === order.id ? 'shadow-xl ring-1 ring-primary/20' : 'hover:border-primary/30'}`}>
+                <div className="grid gap-3">
+                    {orders.map((order) => {
+                        const isPending = order.status?.toLowerCase() === 'pending';
+                        const isLoadingDetails = fetchingDetails[order.id];
 
-                            {/* --- ORDER ROW SUMMARY --- */}
-                            <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        return (
+                            <div key={order.id} className={`bg-card border border-white/5 text-current rounded-2xl overflow-hidden transition-all duration-300 ${expandedOrder === order.id ? 'shadow-xl ring-1 ring-primary/20' : 'hover:border-primary/30'}`}>
+                                <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 
-                                {/* Left: Icon & Info (Clickable for Expand) */}
-                                <div onClick={() => toggleOrder(order.id)} className="flex items-center gap-3 cursor-pointer flex-1">
-                                    <div className={`p-2.5 rounded-xl transition-colors ${expandedOrder === order.id ? 'bg-primary text-black' : 'bg-white/5 text-current'}`}>
-                                        <Package size={18} />
-                                    </div>
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-0.5">
-                                            {/* NAVIGATE TO DETAIL PAGE ON CLICK */}
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); navigate(`/account/orders/${order.id}`); }}
-                                                className="font-mono text-xs font-bold text-primary hover:underline"
-                                            >
-                                                {formatOrderId(order.id)}
-                                            </button>
-                                            <span className="text-[9px] opacity-40 uppercase font-bold">{new Date(order.created_at).toLocaleDateString()}</span>
+                                    {/* Left: Info */}
+                                    <div onClick={() => toggleOrder(order.id)} className="flex items-center gap-3 cursor-pointer flex-1">
+                                        <div className={`p-2.5 rounded-xl transition-colors ${expandedOrder === order.id ? 'bg-primary text-black' : 'bg-white/5 text-current'}`}>
+                                            <Package size={18} />
                                         </div>
-                                        <div className="text-lg font-display font-bold italic leading-none">{formatPrice(order.total_cents, currentCurrency)}</div>
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-0.5">
+                                                <span className="font-mono text-xs font-bold text-primary">{formatOrderId(order.id)}</span>
+                                                <span className="text-[9px] opacity-40 uppercase font-bold">{new Date(order.created_at).toLocaleDateString()}</span>
+                                            </div>
+                                            <div className="text-lg font-display font-bold italic leading-none">{formatPrice(order.total_cents, currentCurrency)}</div>
+                                        </div>
+                                    </div>
+
+                                    {/* Right: Actions */}
+                                    <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto border-t sm:border-t-0 border-white/5 pt-3 sm:pt-0">
+                                        <OrderStatusBadge status={order.status} />
+
+                                        <div className="flex items-center gap-2">
+                                            {/* VIEW ORDER BUTTON */}
+                                            <button
+                                                onClick={(e) => handleViewFullOrder(e, order.id)}
+                                                className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg transition-colors border border-white/5"
+                                                title="View Full Details"
+                                            >
+                                                <Eye size={14} className="opacity-70" />
+                                                <span className="text-[10px] font-bold uppercase tracking-wide">View Order</span>
+                                            </button>
+
+                                            {/* RECEIPT BUTTON */}
+                                            <button
+                                                onClick={(e) => handleOpenInvoice(e, order)}
+                                                className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                                                title={isPending ? "View Invoice" : "View Receipt"}
+                                            >
+                                                {isLoadingDetails ? (
+                                                    <Loader2 size={16} className="animate-spin opacity-50" />
+                                                ) : (
+                                                    <FileText size={16} className="opacity-50 hover:opacity-100" />
+                                                )}
+                                            </button>
+
+                                            {/* EXPAND TOGGLE */}
+                                            <button
+                                                onClick={() => toggleOrder(order.id)}
+                                                className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                                            >
+                                                <ChevronDown size={16} className={`transition-transform duration-300 opacity-50 ${expandedOrder === order.id ? 'rotate-180' : ''}`} />
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Right: Actions (Always Visible) */}
-                                <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto border-t sm:border-t-0 border-white/5 pt-3 sm:pt-0">
-                                    <OrderStatusBadge status={order.status} />
-
-                                    <div className="flex items-center gap-1">
-                                        {/* VIEW FULL DETAILS */}
-                                        <button
-                                            onClick={(e) => handleViewFullOrder(e, order.id)}
-                                            className="p-2 hover:bg-white/10 rounded-full transition-colors"
-                                            title="View Full Details"
-                                        >
-                                            <Eye size={16} className="opacity-70" />
-                                        </button>
-
-                                        {/* PRINT RECEIPT */}
-                                        <button
-                                            onClick={(e) => handleViewReceipt(e, order)}
-                                            className="p-2 hover:bg-white/10 rounded-full transition-colors"
-                                            title={isPending ? "Print Invoice" : "Print Receipt"}
-                                        >
-                                            {isLoadingDetails ? (
-                                                <Loader2 size={16} className="animate-spin opacity-50" />
-                                            ) : (
-                                                isPending ? <FileText size={16} className="text-yellow-500" /> : <Printer size={16} className="opacity-70" />
-                                            )}
-                                        </button>
-
-                                        {/* EXPAND TOGGLE */}
-                                        <button
-                                            onClick={() => toggleOrder(order.id)}
-                                            className="p-2 hover:bg-white/10 rounded-full transition-colors"
-                                        >
-                                            <ChevronDown size={16} className={`transition-transform duration-300 opacity-50 ${expandedOrder === order.id ? 'rotate-180' : ''}`} />
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* --- EXPANDABLE ITEMS LIST --- */}
-                            <div className={`overflow-hidden transition-[max-height] duration-500 ease-in-out ${expandedOrder === order.id ? 'max-h-[800px]' : 'max-h-0'}`}>
-                                <div className="p-4 pt-0 border-t border-white/5 bg-black/20">
-                                    <div className="space-y-2 pt-4">
-                                        <h4 className="text-[9px] uppercase font-black tracking-widest opacity-40 mb-2">Items</h4>
-                                        {isLoadingDetails ? (
-                                            <div className="flex justify-center py-4"><Loader2 className="animate-spin opacity-50" size={20} /></div>
-                                        ) : (
-                                            order.items && order.items.length > 0 ? (
-                                                order.items.map((item, index) => (
-                                                    <div key={index} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="h-10 w-10 rounded-lg bg-white/5 overflow-hidden border border-white/10 flex-shrink-0">
-                                                                {item.image || item.image_url ?
-                                                                    <img src={item.image || item.image_url} alt={item.product_name} className="h-full w-full object-cover" />
-                                                                    : <ShoppingBag size={14} className="opacity-20 m-auto" />
-                                                                }
-                                                            </div>
-                                                            <div>
-                                                                <div className="font-bold text-xs leading-tight">{item.product_name}</div>
-                                                                {item.size && <div className="text-[9px] opacity-60 mt-0.5 uppercase tracking-wide">Size: {item.size}</div>}
-                                                            </div>
+                                {/* Items Dropdown */}
+                                <div className={`overflow-hidden transition-[max-height] duration-500 ease-in-out ${expandedOrder === order.id ? 'max-h-[800px]' : 'max-h-0'}`}>
+                                    <div className="p-4 pt-0 border-t border-white/5 bg-black/20">
+                                        <div className="space-y-2 pt-4">
+                                            {order.items && order.items.map((item, index) => (
+                                                <div key={index} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-10 w-10 rounded-lg bg-white/5 overflow-hidden border border-white/10 flex-shrink-0">
+                                                            {item.image || item.image_url ?
+                                                                <img src={item.image || item.image_url} alt={item.product_name} className="h-full w-full object-cover" />
+                                                                : <ShoppingBag size={14} className="opacity-20 m-auto" />
+                                                            }
                                                         </div>
-                                                        <div className="text-right">
-                                                            <div className="font-mono text-xs opacity-60">x{item.quantity}</div>
-                                                            <div className="font-bold text-xs mt-0.5">
-                                                                {formatPrice((item.price ? item.price * 100 : item.price_cents), currentCurrency)}
-                                                            </div>
+                                                        <div>
+                                                            <div className="font-bold text-xs leading-tight">{item.product_name}</div>
+                                                            {item.size && <div className="text-[9px] opacity-60 mt-0.5 uppercase tracking-wide">Size: {item.size}</div>}
                                                         </div>
                                                     </div>
-                                                ))
-                                            ) : <div className="p-3 bg-white/5 text-center text-xs opacity-60 rounded-xl">No items details found.</div>
-                                        )}
+                                                    <div className="text-right">
+                                                        <div className="font-mono text-xs opacity-60">x{item.quantity}</div>
+                                                        <div className="font-bold text-xs mt-0.5">
+                                                            {formatPrice((item.price ? item.price * 100 : item.price_cents), currentCurrency)}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-
-                        </div>
-                    );
-                })}
+                        );
+                    })}
+                </div>
             </div>
-        </div>
+        </>
     );
 };
